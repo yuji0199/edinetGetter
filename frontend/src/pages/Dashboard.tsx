@@ -161,7 +161,7 @@ const Dashboard = () => {
                         <div className="bg-blue-50 p-3 rounded-md mb-4 border border-blue-100">
                             <h4 className="text-xs font-bold text-blue-800 mb-1 uppercase tracking-wider">取得対象</h4>
                             <ul className="text-xs text-blue-700 list-disc list-inside space-y-1">
-                                <li>当日提出された **全書類**</li>
+                                <li>有価証券 / 四半期 / 半期 / 臨時報告書</li>
                                 <li>証券コードが設定されている書類のみ</li>
                                 <li>バックグラウンドで処理を実行</li>
                             </ul>

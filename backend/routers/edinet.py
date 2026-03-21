@@ -35,8 +35,8 @@ def run_full_sync(target_date: date):
     """
     db = database.SessionLocal()
     try:
-        # Fetch all documents (no docTypeCode filter in services by default now)
-        docs = edinet_client.get_document_list(target_date, only_financial=False)
+        # Fetch financial documents (Yuho, Quarterly, Semi-annual, Extraordinary)
+        docs = edinet_client.get_document_list(target_date)
         
         processed = 0
         errors = 0

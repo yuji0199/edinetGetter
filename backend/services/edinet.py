@@ -20,7 +20,7 @@ class EdinetClient:
         # Users must provide their own subscription key via .env if EDINET mandates it
         self.subscription_key = os.getenv("EDINET_API_KEY", "")
 
-    def get_document_list(self, target_date: date, only_financial: bool = False) -> List[EdinetDocumentInfo]:
+    def get_document_list(self, target_date: date, only_financial: bool = True) -> List[EdinetDocumentInfo]:
         """
         Fetches the list of submitted documents for a specific date.
         type=2 retrieves all metadata.

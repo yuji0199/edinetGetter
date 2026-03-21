@@ -58,8 +58,8 @@ def run_sync(target_date=None, force=False):
     
     db = SessionLocal()
     try:
-        # Fetch all documents for the date
-        docs = edinet_client.get_document_list(sync_date, only_financial=False)
+        # Fetch financial documents for the date (only_financial=True by default)
+        docs = edinet_client.get_document_list(sync_date)
         logger.info(f"Found {len(docs)} documents on EDINET.")
         
         processed = 0
