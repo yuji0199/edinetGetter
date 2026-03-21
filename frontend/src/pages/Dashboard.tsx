@@ -155,7 +155,15 @@ const Dashboard = () => {
                         EDINETデータ同期
                     </h2>
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <p className="text-sm text-gray-500 mb-4">指定した日付のXBRL書類を取得・解析します。</p>
+                        <p className="text-sm text-gray-500 mb-2">指定した日付のXBRL書類を取得・解析します。</p>
+                        <div className="bg-blue-50 p-3 rounded-md mb-4 border border-blue-100">
+                            <h4 className="text-xs font-bold text-blue-800 mb-1 uppercase tracking-wider">取得対象</h4>
+                            <ul className="text-xs text-blue-700 list-disc list-inside space-y-1">
+                                <li>有価証券 / 四半期 / 半期 / 臨時報告書</li>
+                                <li>証券コードが設定されている書類のみ</li>
+                                <li>1回の同期につき最大 3 件 (開発用制限)</li>
+                            </ul>
+                        </div>
 
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-1">対象日</label>
