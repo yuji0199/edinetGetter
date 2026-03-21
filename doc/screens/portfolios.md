@@ -3,7 +3,7 @@
 お気に入りの銘柄や保有株をグループ化して管理します。
 
 ## 画面イメージ
-![Portfolios Mockup](../images/portfolios.png)
+![Portfolios Screen](../images/portfolios.png)
 
 ## 役割
 ユーザーが作成したポートフォリオのグループを管理する。

@@ -3,7 +3,7 @@
 選択したポートフォリオに含まれる具体的な銘柄(Portfolio Items)を一覧表示・管理します。
 
 ## 画面イメージ
-![Portfolio Detail Mockup](../images/portfolio_detail.png)
+![Portfolio Detail Screen](../images/portfolio_detail.png)
 
 ## 役割
 選択したポートフォリオに含まれる具体的な銘柄(Portfolio Items)を一覧表示・管理する。

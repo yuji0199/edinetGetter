@@ -3,7 +3,7 @@
 ユーザー独自のスクリーニング条件 (分析手法) を作成・管理し、実行結果を確認します。
 
 ## 画面イメージ
-![Analysis Methods Mockup](../images/analysis_methods.png)
+![Analysis Methods Screen](../images/analysis_methods.png)
 
 ## 役割
 ユーザー独自のスクリーニング条件 (分析手法) を作成・管理し、実行結果を確認する。

@@ -3,7 +3,7 @@
 特定の企業（銘柄）の詳細なハイライトと財務データを視覚的に表示します。
 
 ## 画面イメージ
-![Stock Detail Mockup](../images/stock_detail.png)
+![Stock Detail Screen](../images/stock_detail.png)
 
 ## 役割
 特定の企業（銘柄）の詳細なハイライトと財務データを視覚的に表示する。

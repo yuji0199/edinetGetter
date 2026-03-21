@@ -3,7 +3,7 @@
 ユーザーの新規登録とログイン。
 
 ## 画面イメージ
-![Auth Mockup](../images/auth.png)
+![Auth Screen](../images/auth.png)
 
 ## 役割
 ユーザーの新規登録とログイン。

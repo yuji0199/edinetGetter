@@ -3,7 +3,7 @@
 おかえりなさい、投資家さん。EDINETデータでポートフォリオを管理し、新しい企業を分析しましょう。
 
 ## 画面イメージ
-![Dashboard Mockup](../images/dashboard.png)
+![Dashboard Screen](../images/dashboard.png)
 
 ## 役割
 ログイン直後に表示されるホーム画面。主要機能へのショートカットと、最近のデータ更新状況を提供する。
