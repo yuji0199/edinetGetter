@@ -34,9 +34,11 @@ const Dashboard = () => {
                 cleanDate = cleanDate.replace(/\//g, '-');
             }
             // Ensure YYYY-MM-DD format roughly
-            const res = await api.post(`/edinet/sync?target_date=${cleanDate}&limit=3`);
-            setSyncMessage(`成功: 処理完了 ${res.data.processed} 件 エラー: ${res.data.errors} 件`);
-            fetchDocuments();
+            const res = await api.post(`/edinet/sync?target_date=${cleanDate}`);
+            setSyncMessage(`同期処理を開始しました: ${res.data.message}`);
+            // We don't call fetchDocuments() immediately because it's background
+            // But we can trigger a refresh after some delay or let user do it
+            setTimeout(fetchDocuments, 5000);
         } catch (error: any) {
             let errorMsg = error.message;
             if (error.response?.data?.detail) {
@@ -159,9 +161,9 @@ const Dashboard = () => {
                         <div className="bg-blue-50 p-3 rounded-md mb-4 border border-blue-100">
                             <h4 className="text-xs font-bold text-blue-800 mb-1 uppercase tracking-wider">取得対象</h4>
                             <ul className="text-xs text-blue-700 list-disc list-inside space-y-1">
-                                <li>有価証券 / 四半期 / 半期 / 臨時報告書</li>
+                                <li>当日提出された **全書類**</li>
                                 <li>証券コードが設定されている書類のみ</li>
-                                <li>1回の同期につき最大 3 件 (開発用制限)</li>
+                                <li>バックグラウンドで処理を実行</li>
                             </ul>
                         </div>
 
@@ -181,7 +183,7 @@ const Dashboard = () => {
                             className={`w-full flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isSyncing ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                             {isSyncing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {isSyncing ? '同期中...' : '今すぐ同期 (上限: 3件)'}
+                            {isSyncing ? 'リクエスト中...' : '同期ジョブを開始'}
                         </button>
 
                         {syncMessage && (

@@ -20,7 +20,7 @@ class EdinetClient:
         # Users must provide their own subscription key via .env if EDINET mandates it
         self.subscription_key = os.getenv("EDINET_API_KEY", "")
 
-    def get_document_list(self, target_date: date) -> List[EdinetDocumentInfo]:
+    def get_document_list(self, target_date: date, only_financial: bool = False) -> List[EdinetDocumentInfo]:
         """
         Fetches the list of submitted documents for a specific date.
         type=2 retrieves all metadata.
@@ -39,12 +39,13 @@ class EdinetClient:
         results = []
         if data.get("results"):
             for item in data["results"]:
-                # Filter for ordinary financial reports (有価証券報告書, 四半期報告書, 半期報告書)
-                # docTypeCode: 120 (有価証券報告書), 130 (半期報告書), 140 (四半期報告書), 150 (臨時報告書)
-                # Confirmation letters and other non-financial docs should be skipped.
                 doc_type_code = item.get("docTypeCode")
-                if doc_type_code not in ["120", "130", "140", "150"]:
-                    continue
+                
+                # Optional: Filter for ordinary financial reports if requested
+                if only_financial:
+                    # docTypeCode: 120 (有価証券報告書), 130 (半期報告書), 140 (四半期報告書), 150 (臨時報告書)
+                    if doc_type_code not in ["120", "130", "140", "150"]:
+                        continue
                     
                 d = EdinetDocumentInfo(
                     docID=item.get("docID"),
