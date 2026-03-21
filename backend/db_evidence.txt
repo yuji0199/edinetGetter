@@ -1,0 +1,39 @@
+
+Recent Financial Documents in DB:
+==============================
+[6871] 株式会社日本マイクロニクス (Doc: S100T65A)
+  -> Extracted Metrics (9 tags):
+     net_sales: 38,292,000,000.0
+     operating_income: 8,582,000,000.0
+     ordinary_income: 5,675,000,000.0
+     net_income: 4,127,000,000.0
+     total_assets: 55,849,000,000.0
+     net_assets: 41,200,000,000.0
+     operating_cf: 4,837,000,000.0
+     investing_cf: -7,497,000,000.0
+     financing_cf: -2,175,000,000.0
+
+[7716] 株式会社ナカニシ (Doc: S100T5R7)
+  -> Extracted Metrics (9 tags):
+     net_sales: 36,672,868.0
+     operating_income: 10,055,190.0
+     ordinary_income: 15,697,965.0
+     net_income: 12,080,846.0
+     total_assets: 95,119,077.0
+     net_assets: 83,418,069.0
+     operating_cf: 8,549,399,000.0
+     investing_cf: -19,149,217,000.0
+     financing_cf: 3,406,227,000.0
+
+[6977] 株式会社日本抵抗器製作所 (Doc: S100T4N2)
+  -> Extracted Metrics (9 tags):
+     net_sales: 7,176,197.0
+     operating_income: 100,326.0
+     ordinary_income: 139,094.0
+     net_income: 99,110.0
+     total_assets: 7,645,823.0
+     net_assets: 2,138,312.0
+     operating_cf: 186,783.0
+     investing_cf: 204,339.0
+     financing_cf: 494,525.0
+
