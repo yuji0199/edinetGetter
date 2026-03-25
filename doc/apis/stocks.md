@@ -148,30 +148,71 @@
 148: 
 149: | No | 項目名 | 型 | 備考 |
 150: | :--- | :--- | :--- | :--- |
-151: | 1 | series | Array | 年度ごとのデータリスト |
-152: | 1.1 | year | String | 会計年度（例: "2023"） |
-153: | 1.2 | sales | Number | 売上高 |
-154: | 1.3 | sales_growth | Number | 売上高成長率 (%) |
-155: | 1.4 | profit | Number | 営業利益 |
-156: | 1.5 | profit_growth | Number | 営業利益成長率 (%) |
-157: | 2 | cagr_sales | Number | 売上高の年平均成長率 (%) |
-158: | 3 | cagr_profit | Number | 営業利益の年平均成長率 (%) |
-159: 
-160: </div>
-161: 
-162: **処理詳細**
-163: <div class="api-logic">
-164: 
-165: 1. 銘柄情報の取得
-166:    - `stocks` テーブルから `securities_code` で検索
-167:    →存在しない場合: エラー（404 Not Found）を返却
-168: 2. 過去の財務ドキュメント取得
-169:    - `financial_documents` テーブルから対象銘柄のデータを過去 `years` 分取得
-170:    - 取得条件: `submit_datetime` の降順
-171: 3. データの整理と計算
-172:    - 年度ごとの `net_sales`, `operating_income` を抽出
-173:    - 前年比（YoY）を算出： `(当年 - 前年) / 前年 * 100`
-174:    - CAGRを算出： `((最新値 / 最古値) ^ (1 / 年数) - 1) * 100`
-175:    →項目名: `series`, `cagr_sales`, `cagr_profit` を返却（処理終了）
-176: 
-177: </div>
+
+## [API018] 成長性分析データの取得
+
+過去数年間の財務データに基づき、売上高および利益の成長率（YoY）と年平均成長率（CAGR）を取得します。
+
+**基本情報**
+* **Method**: GET
+* **Path**: `/api/stocks/{securities_code}/growth`
+* **認証**: 不要
+
+**変更履歴**
+<div class="log">
+
+| No | 変更日 | 変更セクション | 変更項目 | 変更者 |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | 2026-03-25 | 全体 | 新規作成 | antigravity |
+
+</div>
+
+**リクエストパラメータ**
+<div class="api-request">
+
+| No | 場所 | 項目名 | 型 | 必須 | 備考 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | Path | securities_code | String | ○ | 証券コード（4桁） |
+| 2 | Query | years | Number | - | 計算対象年数（デフォルト: 5） |
+
+</div>
+
+**レスポンス**
+<div class="api-response">
+
+| No | 項目名 | 型 | 備考 |
+| :--- | :--- | :--- | :--- |
+| 1 | series | Array | 年度ごとのデータリスト |
+| 1.1 | year | String | 会計年度（例: "2023"） |
+| 1.2 | sales | Number | 売上高 |
+| 1.3 | sales_growth | Number | 売上高成長率 (%) |
+| 1.4 | profit | Number | 営業利益 |
+| 1.5 | profit_growth | Number | 営業利益成長率 (%) |
+| 1.6 | ordinary_income_growth | Number | 経常利益成長率 (%) |
+| 1.7 | net_income_growth | Number | 当期純利益成長率 (%) |
+| 1.8 | dividend_growth | Number | 配当成長率 (%) |
+| 1.9 | operating_cf_growth | Number | 営業CF成長率 (%) |
+| 1.10 | fcf | Number | フリーキャッシュフロー |
+| 1.11 | fcf_growth | Number | FCF成長率 (%) |
+| 2 | cagr_sales | Number | 売上高の年平均成長率 (%) |
+| 3 | cagr_profit | Number | 営業利益の年平均成長率 (%) |
+
+</div>
+
+**処理詳細**
+<div class="api-logic">
+
+1. 銘柄情報の取得
+   - `stocks` テーブルから `securities_code` で検索
+   →存在しない場合: エラー（404 Not Found）を返却
+2. 過去の財務ドキュメント取得
+   - `financial_documents` テーブルから対象銘柄のデータを過去 `years` 分取得
+   - 取得条件: `submit_datetime` の降順
+3. データの整理と計算
+   - 年度ごとの `net_sales`, `operating_income`, `ordinary_income`, `net_income`, `dividends_paid`, `operating_cash_flows`, `investing_cash_flows` を抽出
+   - 各年度のFCFを計算： `operating_cf + investing_cf`
+   - 前年比（YoY）を各利益・CF・FCF項目について算出
+   - CAGRを主要項目（売上・営業利益）について算出
+   →項目名: `series`, `cagr_sales`, `cagr_profit` を返却（処理終了）
+
+</div>
