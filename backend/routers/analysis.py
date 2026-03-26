@@ -147,20 +147,43 @@ def run_screening(
         is_match = True
         extracted_info = {}
         
+        # Cache growth result for this stock if multiple growth conditions exist
+        growth_result = None
+
         for cond in conditions:
-            metric_key = cond.get("metric")
+            metric_key = cond.get("metric", "")
             operator = cond.get("operator")
             target_value = cond.get("value")
             
             if not all([metric_key, operator, target_value is not None]):
                 is_match = False
                 break
+            
+            # 1. Determine the metric value
+            metric_val = None
+            
+            # Check if it's a growth or CAGR metric
+            if metric_key.endswith("_growth") or metric_key.startswith("cagr_") or metric_key == "fcf":
+                if growth_result is None:
+                    from .growth import calculate_growth_for_stock
+                    growth_result = calculate_growth_for_stock(doc.stock_id, db)
                 
-            metric_val = metrics.get(metric_key)
+                if metric_key.startswith("cagr_"):
+                    metric_val = getattr(growth_result, metric_key, 0)
+                elif metric_key.endswith("_growth") or metric_key == "fcf":
+                    if growth_result.latest:
+                        metric_val = getattr(growth_result.latest, metric_key, 0)
+                    else:
+                        metric_val = 0
+            else:
+                # Standard metric from latest doc
+                metric_val = metrics.get(metric_key)
+                
             if metric_val is None:
                 is_match = False
                 break
                 
+            # 2. Evaluate condition
             try:
                 metric_val_float = float(metric_val)
                 target_value_float = float(target_value)

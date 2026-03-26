@@ -107,10 +107,26 @@ def run_sync(target_date=None, force=False):
                     except ValueError:
                         pass
 
+                # Parse period dates
+                period_start = None
+                period_end = None
+                if metrics.get("period_start"):
+                    try:
+                        period_start = datetime.strptime(metrics["period_start"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    except ValueError:
+                        pass
+                if metrics.get("period_end"):
+                    try:
+                        period_end = datetime.strptime(metrics["period_end"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    except ValueError:
+                        pass
+
                 # Save doc
                 new_doc = models.FinancialDocument(
                     doc_id=doc.docID,
                     stock_id=stock.id,
+                    period_start=period_start,
+                    period_end=period_end,
                     submit_datetime=submit_dt,
                     metrics_json=json.dumps(metrics)
                 )

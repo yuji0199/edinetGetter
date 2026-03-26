@@ -108,3 +108,32 @@ class PortfolioResponse(PortfolioBase):
 
     class Config:
         from_attributes = True
+
+class GrowthSeriesItem(BaseModel):
+    year: str
+    sales: float
+    operating_income: float
+    ordinary_income: float
+    net_income: float
+    dividend: float
+    operating_cf: float
+    fcf: float
+    sales_growth: float
+    profit_growth: float
+    ordinary_growth: float
+    net_income_growth: float
+    dividend_growth: float
+    operating_cf_growth: float
+    fcf_growth: float
+
+    class Config:
+        from_attributes = True
+
+class GrowthAnalysisResponse(BaseModel):
+    series: List[GrowthSeriesItem]
+    cagr_sales: float
+    cagr_profit: float
+    latest: Optional[GrowthSeriesItem] = None
+
+    class Config:
+        from_attributes = True

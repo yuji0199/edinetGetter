@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, stocks, edinet, analysis, portfolio
+from routers import auth, stocks, edinet, analysis, portfolio, growth
 import models
 from database import engine
 
@@ -25,6 +25,7 @@ app.include_router(stocks.router, prefix="/api")
 app.include_router(edinet.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(portfolio.router, prefix="/api")
+app.include_router(growth.router, prefix="/api")
 
 @app.get("/")
 def read_root():

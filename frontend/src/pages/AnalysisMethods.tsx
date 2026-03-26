@@ -37,6 +37,15 @@ const AnalysisMethods: React.FC = () => {
         { value: 'roa', label: '総資産利益率 (ROA) %' },
         { value: 'equity_ratio', label: '自己資本比率 %' },
         { value: 'operating_margin', label: '営業利益率 %' },
+        { value: 'sales_growth', label: '売上高成長率 %' },
+        { value: 'profit_growth', label: '営業益成長率 %' },
+        { value: 'ordinary_growth', label: '経常益成長率 %' },
+        { value: 'net_income_growth', label: '純利益成長率 %' },
+        { value: 'dividend_growth', label: '配当成長率 %' },
+        { value: 'fcf_growth', label: 'FCF成長率 %' },
+        { value: 'cagr_sales', label: '売上高CAGR %' },
+        { value: 'cagr_profit', label: '営業益CAGR %' },
+        { value: 'fcf', label: 'フリーキャッシュフロー (FCF)' },
     ];
 
     const fetchMethods = async () => {
@@ -137,7 +146,8 @@ const AnalysisMethods: React.FC = () => {
 
     const formatMetric = (key: string, value: number | undefined) => {
         if (value === undefined || value === null) return '-';
-        if (['roe', 'roa', 'equity_ratio', 'operating_margin'].includes(key)) {
+        const isPercentage = ['roe', 'roa', 'equity_ratio', 'operating_margin'].includes(key) || key.endsWith('_growth') || key.startsWith('cagr_');
+        if (isPercentage) {
             return `${value.toFixed(2)}%`;
         }
         if (['eps', 'bps'].includes(key)) {

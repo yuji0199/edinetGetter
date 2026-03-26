@@ -50,12 +50,41 @@ export interface ScreeningResult {
     metrics: Record<string, number>;
 }
 
+export interface GrowthSeriesItem {
+    year: string;
+    sales: number;
+    operating_income: number;
+    ordinary_income: number;
+    net_income: number;
+    dividend: number;
+    operating_cf: number;
+    fcf: number;
+    sales_growth: number;
+    profit_growth: number;
+    ordinary_growth: number;
+    net_income_growth: number;
+    dividend_growth: number;
+    operating_cf_growth: number;
+    fcf_growth: number;
+}
+
+export interface GrowthAnalysisResponse {
+    series: GrowthSeriesItem[];
+    cagr_sales: number;
+    cagr_profit: number;
+}
+
 // Analysis Methods APIs
 export const getAnalysisMethods = () => api.get<AnalysisMethod[]>('/analysis/');
 export const createAnalysisMethod = (data: AnalysisMethodCreate) => api.post<AnalysisMethod>('/analysis/', data);
 export const updateAnalysisMethod = (id: number, data: AnalysisMethodCreate) => api.put<AnalysisMethod>(`/analysis/${id}`, data);
 export const deleteAnalysisMethod = (id: number) => api.delete(`/analysis/${id}`);
 export const runScreening = (id: number) => api.post<ScreeningResult[]>(`/analysis/${id}/screen`);
+
+// Stock APIs
+export const getStock = (code: string) => api.get<Stock>(`/stocks/${code}`);
+export const getStockDocuments = (code: string) => api.get<any[]>(`/stocks/${code}/documents`);
+export const getStockGrowth = (code: string) => api.get<GrowthAnalysisResponse>(`/stocks/${code}/growth`);
 
 // Portfolio APIs
 export interface PortfolioItem {

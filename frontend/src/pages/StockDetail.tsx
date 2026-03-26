@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Building2, TrendingUp, BarChart3, Clock, AlertCircle, FolderPlus, X } from 'lucide-react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import api from '../api';
-import type { Portfolio } from '../api';
+import { ArrowLeft, Building2, TrendingUp, BarChart3, Clock, AlertCircle, FolderPlus, X, LineChart as LineChartIcon, Zap } from 'lucide-react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, LineChart, Line } from 'recharts';
+import api, { getStockGrowth } from '../api';
+import type { Portfolio, GrowthAnalysisResponse } from '../api';
 
 const METRIC_LABELS: Record<string, string> = {
     net_sales: "売上高",
@@ -20,13 +20,24 @@ const METRIC_LABELS: Record<string, string> = {
     roe: "自己資本利益率 (ROE)",
     roa: "総資産利益率 (ROA)",
     equity_ratio: "自己資本比率",
-    operating_margin: "営業利益率"
+    operating_margin: "営業利益率",
+    operating_cf_growth: "営業CF成長率",
+    fcf_growth: "自己株式・フリーCF成長率", // Using requested name for growth
+    sales_growth: "売上高成長率",
+    profit_growth: "営利成長率",
+    ordinary_growth: "経利成長率",
+    net_income_growth: "純利成長率",
+    dividend_growth: "配当成長率",
+    cagr_sales: "売上高CAGR",
+    cagr_profit: "営業益CAGR",
+    fcf: "フリーキャッシュフロー (FCF)"
 };
 
 const StockDetail = () => {
     const { code } = useParams<{ code: string }>();
     const [stock, setStock] = useState<any>(null);
     const [documents, setDocuments] = useState<any[]>([]);
+    const [growth, setGrowth] = useState<GrowthAnalysisResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -43,13 +54,15 @@ const StockDetail = () => {
             if (!code) return;
             try {
                 setLoading(true);
-                const [stockRes, docsRes, portRes] = await Promise.all([
+                const [stockRes, docsRes, portRes, growthRes] = await Promise.all([
                     api.get(`/stocks/${code}`),
                     api.get(`/stocks/${code}/documents`),
-                    api.get('/portfolios/')
+                    api.get('/portfolios/'),
+                    getStockGrowth(code)
                 ]);
                 setStock(stockRes.data);
                 setPortfolios(portRes.data);
+                setGrowth(growthRes.data);
 
                 // Parse metrics JSON
                 const parsedDocs = docsRes.data.map((doc: any) => ({
@@ -197,6 +210,95 @@ const StockDetail = () => {
 
             {documents.length > 0 ? (
                 <div className="space-y-8">
+                    {/* Growth Analysis Section */}
+                    {growth && growth.series.length > 0 && (
+                        <div className="space-y-8 mt-12">
+                            <h2 className="text-2xl font-bold text-gray-900 border-l-4 border-blue-600 pl-4 py-1">
+                                成長性分析 (Growth Analysis)
+                            </h2>
+                            
+                            {/* CAGR Summary Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-xl border border-blue-100 shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-blue-600 uppercase tracking-wider">売上高平均成長率 (CAGR)</p>
+                                            <p className="text-3xl font-bold text-blue-900 mt-1">{growth.cagr_sales}%</p>
+                                        </div>
+                                        <div className="bg-blue-100 p-3 rounded-lg">
+                                            <TrendingUp className="h-6 w-6 text-blue-600" />
+                                        </div>
+                                    </div>
+                                    <p className="mt-4 text-xs text-gray-500 italic">過去 {growth.series.length} 年間の幾何平均成長率</p>
+                                </div>
+                                <div className="bg-gradient-to-br from-emerald-50 to-white p-6 rounded-xl border border-emerald-100 shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-emerald-600 uppercase tracking-wider">営業利益平均成長率 (CAGR)</p>
+                                            <p className="text-3xl font-bold text-emerald-900 mt-1">{growth.cagr_profit}%</p>
+                                        </div>
+                                        <div className="bg-emerald-100 p-3 rounded-lg">
+                                            <Zap className="h-6 w-6 text-emerald-600" />
+                                        </div>
+                                    </div>
+                                    <p className="mt-4 text-xs text-gray-500 italic">過去 {growth.series.length} 年間の幾何平均成長率</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                {/* Growth Trends Chart */}
+                                <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                                        <LineChartIcon className="mr-2 h-5 w-5 text-gray-500" />
+                                        成長率の推移 (YoY %)
+                                    </h3>
+                                    <div className="h-80">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={growth.series.slice().reverse()} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                                <XAxis dataKey="year" axisLine={false} tickLine={false} />
+                                                <YAxis axisLine={false} tickLine={false} unit="%" />
+                                                <Tooltip 
+                                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                                    formatter={(value: any) => [`${value}%`]}
+                                                />
+                                                <Legend wrapperStyle={{ paddingTop: "20px" }} />
+                                                <Line type="monotone" dataKey="sales_growth" name="売上高成長率" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                                <Line type="monotone" dataKey="profit_growth" name="営業益成長率" stroke="#10B981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                                <Line type="monotone" dataKey="fcf_growth" name="FCF成長率" stroke="#F59E0B" strokeWidth={2} strokeDasharray="5 5" />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                {/* Growth Metrics List */}
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                                    <div className="p-4 border-b border-gray-100 bg-gray-50">
+                                        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">
+                                            直近の成長指標
+                                        </h3>
+                                    </div>
+                                    <div className="flex-1 overflow-auto p-4 space-y-3">
+                                        {growth.series.length > 0 && [
+                                            { key: 'sales_growth', val: growth.series[0].sales_growth },
+                                            { key: 'profit_growth', val: growth.series[0].profit_growth },
+                                            { key: 'ordinary_growth', val: growth.series[0].ordinary_growth },
+                                            { key: 'net_income_growth', val: growth.series[0].net_income_growth },
+                                            { key: 'dividend_growth', val: growth.series[0].dividend_growth },
+                                            { key: 'fcf_growth', val: growth.series[0].fcf_growth },
+                                        ].map(item => (
+                                            <div key={item.key} className="flex justify-between items-center p-3 rounded-lg bg-gray-50 border border-gray-100">
+                                                <span className="text-sm text-gray-600">{METRIC_LABELS[item.key]}</span>
+                                                <span className={`text-sm font-bold ${Number(item.val) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    {item.val >= 0 ? '+' : ''}{item.val}%
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {/* Charts Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {/* Sales and Income Chart */}

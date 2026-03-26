@@ -52,17 +52,39 @@ class XBRLParser:
             "operating_cf": ["jppfs_cor:NetCashProvidedByUsedInOperatingActivities", "ifrs-full:CashFlowsFromUsedInOperatingActivities", "jpcrp_cor:NetCashProvidedByUsedInOperatingActivitiesSummaryOfBusinessResults"], 
             "investing_cf": ["jppfs_cor:NetCashProvidedByUsedInInvestmentActivities", "ifrs-full:CashFlowsFromUsedInInvestingActivities", "jpcrp_cor:NetCashProvidedByUsedInInvestmentActivitiesSummaryOfBusinessResults"], 
             "financing_cf": ["jppfs_cor:NetCashProvidedByUsedInFinancingActivities", "ifrs-full:CashFlowsFromUsedInFinancingActivities", "jpcrp_cor:NetCashProvidedByUsedInFinancingActivitiesSummaryOfBusinessResults"],
+            "dividends_paid": ["jppfs_cor:DividendsPaidCashFlowStatement", "ifrs-full:DividendsPaidClassifiedAsOperatingActivities", "ifrs-full:DividendsPaidClassifiedAsFinancingActivities"],
             "eps": ["jppfs_cor:BasicEarningsLossPerShare", "ifrs-full:BasicEarningsLossPerShare", "jpcrp_cor:BasicEarningsLossPerShareSummaryOfBusinessResults"],
             "bps": ["jppfs_cor:NetAssetsPerShare", "jpcrp_cor:NetAssetsPerShareSummaryOfBusinessResults"]
         }
 
         # To prevent scanning too many files unnecessarily, check missing metrics
+        context_dates = {}
         for filepath in filepaths:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
 
             soup = BeautifulSoup(content, "lxml-xml")
+            
+            # 1. Extract context dates
+            for context in soup.find_all("xbrli:context"):
+                ctx_id = context.get("id")
+                if not ctx_id:
+                    continue
+                
+                period = context.find("xbrli:period")
+                if not period:
+                    continue
+                
+                start_date = period.find("xbrli:startDate")
+                end_date = period.find("xbrli:endDate")
+                instant = period.find("xbrli:instant")
+                
+                if start_date and end_date:
+                    context_dates[ctx_id] = {"start": start_date.text, "end": end_date.text}
+                elif instant:
+                    context_dates[ctx_id] = {"start": None, "end": instant.text}
 
+            # 2. Extract metrics
             for key, tags in targets.items():
                 if key in metrics:
                     continue # Already found the best value for this metric
@@ -100,7 +122,15 @@ class XBRLParser:
                 if candidate_values:
                     # Sort by highest score, then by highest absolute numerical value
                     candidate_values.sort(key=lambda x: (x["score"], abs(x["value"])), reverse=True)
-                    metrics[key] = candidate_values[0]["value"]
+                    best = candidate_values[0]
+                    metrics[key] = best["value"]
+                    
+                    # Store dates if this is a primary metric (NetSales or NetIncome)
+                    if key in ["net_sales", "net_income"] and "period_end" not in metrics:
+                        ctx = best["ctx"]
+                        if ctx in context_dates:
+                            metrics["period_start"] = context_dates[ctx]["start"]
+                            metrics["period_end"] = context_dates[ctx]["end"]
                     
         # Calculate derived metrics
         if metrics.get("net_assets") and metrics["net_assets"] > 0 and metrics.get("net_income") is not None:
