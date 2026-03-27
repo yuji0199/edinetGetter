@@ -165,8 +165,8 @@ def run_screening(
             # Check if it's a growth or CAGR metric
             if metric_key.endswith("_growth") or metric_key.startswith("cagr_") or metric_key == "fcf":
                 if growth_result is None:
-                    from .growth import calculate_growth_for_stock
-                    growth_result = calculate_growth_for_stock(doc.stock_id, db)
+                    from services.growth import calculate_growth_for_stock
+                    growth_result = calculate_growth_for_stock(db, doc.stock_id)
                 
                 if metric_key.startswith("cagr_"):
                     metric_val = getattr(growth_result, metric_key, 0)

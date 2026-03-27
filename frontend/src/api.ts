@@ -81,9 +81,20 @@ export const updateAnalysisMethod = (id: number, data: AnalysisMethodCreate) => 
 export const deleteAnalysisMethod = (id: number) => api.delete(`/analysis/${id}`);
 export const runScreening = (id: number) => api.post<ScreeningResult[]>(`/analysis/${id}/screen`);
 
+export interface StockDocument {
+    id: number;
+    stock_id: number;
+    doc_id: string;
+    period_start?: string;
+    period_end?: string;
+    submit_datetime: string;
+    metrics_json?: string;
+    metrics?: Record<string, number>;
+}
+
 // Stock APIs
 export const getStock = (code: string) => api.get<Stock>(`/stocks/${code}`);
-export const getStockDocuments = (code: string) => api.get<any[]>(`/stocks/${code}/documents`);
+export const getStockDocuments = (code: string) => api.get<StockDocument[]>(`/stocks/${code}/documents`);
 export const getStockGrowth = (code: string) => api.get<GrowthAnalysisResponse>(`/stocks/${code}/growth`);
 
 // Portfolio APIs

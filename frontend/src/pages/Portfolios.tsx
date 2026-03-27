@@ -9,6 +9,7 @@ const Portfolios: React.FC = () => {
     const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [operationError, setOperationError] = useState<string | null>(null);
     const [portfolioToDelete, setPortfolioToDelete] = useState<number | null>(null);
 
     // Create new portfolio state
@@ -37,6 +38,7 @@ const Portfolios: React.FC = () => {
         e.preventDefault();
         if (!newName.trim()) return;
 
+        setOperationError(null);
         try {
             await api.post('/portfolios/', {
                 name: newName,
@@ -47,19 +49,20 @@ const Portfolios: React.FC = () => {
             setIsCreating(false);
             fetchPortfolios();
         } catch (err: any) {
-            alert(err.response?.data?.detail || 'Failed to create portfolio');
+            setOperationError(err.response?.data?.detail || 'Failed to create portfolio');
         }
     };
 
     const confirmDeletePortfolio = async () => {
         if (!portfolioToDelete) return;
 
+        setOperationError(null);
         try {
             await api.delete(`/portfolios/${portfolioToDelete}`);
             setPortfolioToDelete(null);
             fetchPortfolios();
         } catch (err: any) {
-            alert(err.response?.data?.detail || 'Failed to delete portfolio');
+            setOperationError(err.response?.data?.detail || 'Failed to delete portfolio');
         }
     };
 
@@ -78,13 +81,31 @@ const Portfolios: React.FC = () => {
                     <p className="mt-2 text-sm text-gray-500">お気に入りの銘柄や保有株をグループ化して管理します。</p>
                 </div>
                 <button
-                    onClick={() => setIsCreating(!isCreating)}
+                    onClick={() => {
+                        setIsCreating(!isCreating);
+                        setOperationError(null);
+                    }}
                     className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
                 >
                     <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
                     新しいポートフォリオ
                 </button>
             </div>
+
+            {operationError && (
+                <div className="mb-8 p-4 bg-red-50 border-l-4 border-red-500 flex justify-between items-start rounded shadow-sm">
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                            <Plus className="h-5 w-5 text-red-400 rotate-45" />
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm font-bold text-red-700">エラーが発生しました</p>
+                            <p className="text-xs text-red-600 mt-1">{operationError}</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setOperationError(null)} className="text-red-400 hover:text-red-700 font-bold">×</button>
+                </div>
+            )}
 
             {error && (
                 <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-8">

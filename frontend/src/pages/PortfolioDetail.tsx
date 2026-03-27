@@ -11,6 +11,7 @@ const PortfolioDetail: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [removeError, setRemoveError] = useState<string | null>(null);
 
     const fetchPortfolio = async () => {
         setIsLoading(true);
@@ -31,12 +32,13 @@ const PortfolioDetail: React.FC = () => {
 
     const confirmRemoveItem = async () => {
         if (!itemToDelete) return;
+        setRemoveError(null);
         try {
             await api.delete(`/portfolios/${id}/items/${itemToDelete}`);
             setItemToDelete(null);
             fetchPortfolio();
         } catch (err: any) {
-            alert(err.response?.data?.detail || 'Failed to remove item');
+            setRemoveError(err.response?.data?.detail || 'Failed to remove item');
         }
     };
 
@@ -83,6 +85,19 @@ const PortfolioDetail: React.FC = () => {
                     <FileText className="h-5 w-5 text-gray-500" />
                     登録銘柄一覧 ({portfolio.items.length}件)
                 </h2>
+
+                {removeError && (
+                    <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 flex justify-between items-start rounded shadow-sm">
+                        <div className="flex items-start">
+                            <Trash2 className="h-5 w-5 text-red-500 mr-3" />
+                            <div>
+                                <p className="text-sm font-bold text-red-700">解除に失敗しました</p>
+                                <p className="text-xs text-red-600 mt-1">{removeError}</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setRemoveError(null)} className="text-red-400 hover:text-red-700 font-bold">×</button>
+                    </div>
+                )}
 
                 {portfolio.items.length === 0 ? (
                     <div className="text-center bg-gray-50 rounded-lg py-12 border border-gray-200">

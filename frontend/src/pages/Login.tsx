@@ -69,8 +69,9 @@ const Login = () => {
                     </div>
 
                     {error && (
-                        <div className="text-red-500 text-sm font-medium text-center">
-                            {error}
+                        <div className="bg-red-50 border-l-4 border-red-500 p-3 flex justify-between items-center rounded">
+                            <p className="text-red-700 text-sm font-medium">{error}</p>
+                            <button onClick={() => setError('')} className="text-red-400 hover:text-red-600 font-bold">×</button>
                         </div>
                     )}
 

@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Building2, TrendingUp, BarChart3, Clock, AlertCircle, FolderPlus, X, LineChart as LineChartIcon, Zap } from 'lucide-react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, LineChart, Line } from 'recharts';
-import api, { getStockGrowth } from '../api';
-import type { Portfolio, GrowthAnalysisResponse } from '../api';
+import { getStockGrowth, addPortfolioItem, getPortfolios, getStock, getStockDocuments } from '../api';
+import type { Portfolio, GrowthAnalysisResponse, Stock, StockDocument } from '../api';
 
-const METRIC_LABELS: Record<string, string> = {
+/**
+ * 財務指標の表示名マッピング
+ * 画面上のラベルを一元管理するために定義
+ */
+const METRIC_DISPLAY_LABELS: Record<string, string> = {
     net_sales: "売上高",
     operating_income: "営業利益",
     ordinary_income: "経常利益",
@@ -22,7 +26,7 @@ const METRIC_LABELS: Record<string, string> = {
     equity_ratio: "自己資本比率",
     operating_margin: "営業利益率",
     operating_cf_growth: "営業CF成長率",
-    fcf_growth: "自己株式・フリーCF成長率", // Using requested name for growth
+    fcf_growth: "自己株式・フリーCF成長率",
     sales_growth: "売上高成長率",
     profit_growth: "営利成長率",
     ordinary_growth: "経利成長率",
@@ -33,53 +37,64 @@ const METRIC_LABELS: Record<string, string> = {
     fcf: "フリーキャッシュフロー (FCF)"
 };
 
+/**
+ * 銘柄詳細画面コンポーネント
+ * 銘柄の基本情報、財務推移グラフ、成長性分析データを表示する
+ */
 const StockDetail = () => {
     const { code } = useParams<{ code: string }>();
-    const [stock, setStock] = useState<any>(null);
-    const [documents, setDocuments] = useState<any[]>([]);
+    const [stock, setStock] = useState<Stock | null>(null);
+    const [documents, setDocuments] = useState<StockDocument[]>([]);
     const [growth, setGrowth] = useState<GrowthAnalysisResponse | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Portfolio state
-    const [showModal, setShowModal] = useState(false);
+    // ポートフォリオ追加用モーダルの状態管理
+    const [showPortfolioModal, setShowPortfolioModal] = useState<boolean>(false);
     const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-    const [selectedPortfolio, setSelectedPortfolio] = useState<number | ''>('');
-    const [notes, setNotes] = useState('');
-    const [targetPrice, setTargetPrice] = useState<number | ''>('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | ''>('');
+    const [portfolioNotes, setPortfolioNotes] = useState<string>('');
+    const [portfolioTargetPrice, setPortfolioTargetPrice] = useState<number | ''>('');
+    const [isSubmittingPortfolio, setIsSubmittingPortfolio] = useState<boolean>(false);
+    const [portfolioError, setPortfolioError] = useState<string | null>(null);
+    const [portfolioSuccess, setPortfolioSuccess] = useState<boolean>(false);
 
     useEffect(() => {
-        const fetchStockData = async () => {
+        /**
+         * 銘柄の詳細情報、財務書類、ポートフォリオ一覧、成長性データを一括で取得する
+         */
+        const fetchAllStockData = async () => {
             if (!code) return;
             try {
                 setLoading(true);
+                // 並列実行により初期ロード時間を短縮する意図
                 const [stockRes, docsRes, portRes, growthRes] = await Promise.all([
-                    api.get(`/stocks/${code}`),
-                    api.get(`/stocks/${code}/documents`),
-                    api.get('/portfolios/'),
+                    getStock(code),
+                    getStockDocuments(code),
+                    getPortfolios(),
                     getStockGrowth(code)
                 ]);
+                
                 setStock(stockRes.data);
                 setPortfolios(portRes.data);
                 setGrowth(growthRes.data);
 
-                // Parse metrics JSON
-                const parsedDocs = docsRes.data.map((doc: any) => ({
-                    ...doc,
-                    metrics: doc.metrics_json ? JSON.parse(doc.metrics_json) : {}
+                // metrics_jsonをパースして型定義済みのオブジェクトとして扱う
+                const formattedDocuments = docsRes.data.map((document) => ({
+                    ...document,
+                    metrics: document.metrics_json ? JSON.parse(document.metrics_json) : {}
                 }));
-                setDocuments(parsedDocs);
+                setDocuments(formattedDocuments);
                 setError(null);
-            } catch (err: any) {
-                console.error("Failed to fetch stock details", err);
+            } catch (err: unknown) {
+                console.error("銘柄データの取得に失敗しました", err);
                 setError("銘柄詳細の読み込みに失敗しました。証券コードが正しいか確認してください。");
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchStockData();
+        fetchAllStockData();
     }, [code]);
 
     if (loading) {
@@ -107,34 +122,47 @@ const StockDetail = () => {
         );
     }
 
-    // Format data for chart (expecting documents ordered ascending by id/date ideally)
-    const chartData = documents.map(doc => ({
-        name: doc.doc_id, // Could be formatted date if available
-        sales: doc.metrics?.net_sales || 0,
-        opIncome: doc.metrics?.operating_income || 0,
-        ordIncome: doc.metrics?.ordinary_income || 0,
-        netIncome: doc.metrics?.net_income || 0,
+    /**
+     * 財務推移棒グラフ用のデータ整形。
+     * 古い順に表示するために、APIから取得したデータをそのままの順序で変換。
+     */
+    const barChartFormattedData = documents.map(document => ({
+        name: document.doc_id,
+        sales: document.metrics?.net_sales || 0,
+        operating_income: document.metrics?.operating_income || 0,
+        ordinary_income: document.metrics?.ordinary_income || 0,
+        net_income: document.metrics?.net_income || 0,
     }));
 
-    const handleAddToPortfolio = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedPortfolio || !stock) return;
+    /**
+     * ポートフォリオへの新規追加処理。
+     * バリデーション後にAPIを呼び出し、成功時はフォームをリセットする。
+     */
+    const handlePortfolioAdditionSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!selectedPortfolioId || !stock) return;
 
-        setIsSubmitting(true);
+        setIsSubmittingPortfolio(true);
+        setPortfolioError(null);
+        setPortfolioSuccess(false);
         try {
-            await api.post(`/portfolios/${selectedPortfolio}/items`, {
+            await addPortfolioItem(Number(selectedPortfolioId), {
                 stock_id: stock.id,
-                notes: notes,
-                target_price: targetPrice || undefined
+                notes: portfolioNotes,
+                target_price: portfolioTargetPrice || undefined
             });
-            setShowModal(false);
-            setNotes('');
-            setTargetPrice('');
-            alert('ポートフォリオに追加しました！');
+            setPortfolioSuccess(true);
+            setPortfolioNotes('');
+            setPortfolioTargetPrice('');
+            // 成功時は数秒後にモーダルを閉じるか、ユーザーに閉じさせる。ここでは数秒表示してから閉じる。
+            setTimeout(() => {
+                setShowPortfolioModal(false);
+                setPortfolioSuccess(false);
+            }, 2000);
         } catch (err: any) {
-            alert(err.response?.data?.detail || '追加に失敗しました');
+            setPortfolioError(err.response?.data?.detail || '追加に失敗しました。時間をおいて再度お試しください。');
         } finally {
-            setIsSubmitting(false);
+            setIsSubmittingPortfolio(false);
         }
     };
 
@@ -169,12 +197,12 @@ const StockDetail = () => {
                     </div>
                 </div>
 
-                <div className="mt-6 sm:mt-0 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                <div className="p-6 pt-0 sm:pt-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
                     {stock.current_price && (
                         <div className="flex gap-4 sm:gap-6 text-left sm:text-right bg-gray-50 sm:bg-transparent p-4 sm:p-0 rounded-lg w-full sm:w-auto">
                             <div>
                                 <div className="text-xs text-gray-500 font-medium tracking-wide">現在株価</div>
-                                <div className="text-xl sm:text-2xl font-bold text-gray-900 border-b-2 border-primary/20 pb-0.5 mt-0.5">
+                                <div className="text-xl sm:text-2xl font-bold text-gray-900 border-b-2 border-blue-200 pb-0.5 mt-0.5">
                                     ¥{stock.current_price.toLocaleString()}
                                 </div>
                             </div>
@@ -199,7 +227,7 @@ const StockDetail = () => {
 
                     <button
                         type="button"
-                        onClick={() => setShowModal(true)}
+                        onClick={() => setShowPortfolioModal(true)}
                         className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                     >
                         <FolderPlus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
@@ -210,14 +238,14 @@ const StockDetail = () => {
 
             {documents.length > 0 ? (
                 <div className="space-y-8">
-                    {/* Growth Analysis Section */}
+                    {/* 成長性分析セクション: CAGRおよびYoY推移を表示 */}
                     {growth && growth.series.length > 0 && (
                         <div className="space-y-8 mt-12">
                             <h2 className="text-2xl font-bold text-gray-900 border-l-4 border-blue-600 pl-4 py-1">
                                 成長性分析 (Growth Analysis)
                             </h2>
                             
-                            {/* CAGR Summary Cards */}
+                            {/* CAGRサマリーカード: 売上と利益の平均成長率を一目で確認できるようにする */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-xl border border-blue-100 shadow-sm">
                                     <div className="flex items-center justify-between">
@@ -246,7 +274,7 @@ const StockDetail = () => {
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                {/* Growth Trends Chart */}
+                                {/* 成長率推移チャート: YoYでの変動を可視化。FCFは点線で差別化 */}
                                 <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                                     <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
                                         <LineChartIcon className="mr-2 h-5 w-5 text-gray-500" />
@@ -260,7 +288,7 @@ const StockDetail = () => {
                                                 <YAxis axisLine={false} tickLine={false} unit="%" />
                                                 <Tooltip 
                                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                    formatter={(value: any) => [`${value}%`]}
+                                                    formatter={(value: number) => [`${value}%`]}
                                                 />
                                                 <Legend wrapperStyle={{ paddingTop: "20px" }} />
                                                 <Line type="monotone" dataKey="sales_growth" name="売上高成長率" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
@@ -271,7 +299,7 @@ const StockDetail = () => {
                                     </div>
                                 </div>
 
-                                {/* Growth Metrics List */}
+                                {/* 直近指標リスト: 最新年度の数値を網羅 */}
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
                                     <div className="p-4 border-b border-gray-100 bg-gray-50">
                                         <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">
@@ -288,7 +316,7 @@ const StockDetail = () => {
                                             { key: 'fcf_growth', val: growth.series[0].fcf_growth },
                                         ].map(item => (
                                             <div key={item.key} className="flex justify-between items-center p-3 rounded-lg bg-gray-50 border border-gray-100">
-                                                <span className="text-sm text-gray-600">{METRIC_LABELS[item.key]}</span>
+                                                <span className="text-sm text-gray-600">{METRIC_DISPLAY_LABELS[item.key]}</span>
                                                 <span className={`text-sm font-bold ${Number(item.val) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                                     {item.val >= 0 ? '+' : ''}{item.val}%
                                                 </span>
@@ -299,9 +327,9 @@ const StockDetail = () => {
                             </div>
                         </div>
                     )}
-                    {/* Charts Grid */}
+                    
+                    {/* 財務状況棒グラフ: 売上と利益の実数値推移を把握するためのセクション */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Sales and Income Chart */}
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
                                 <BarChart3 className="mr-2 h-5 w-5 text-gray-500" />
@@ -310,24 +338,24 @@ const StockDetail = () => {
                             </h3>
                             <div className="h-80">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: 40, bottom: 0 }}>
+                                    <BarChart data={barChartFormattedData} margin={{ top: 10, right: 10, left: 40, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} />
                                         <YAxis tickFormatter={(value) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', notation: 'compact' }).format(value)} axisLine={false} tickLine={false} width={80} />
                                         <Tooltip
-                                            formatter={(value: any) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(Number(value))}
+                                            formatter={(value: number) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(Number(value))}
                                             cursor={{ fill: '#F3F4F6' }}
                                         />
                                         <Legend wrapperStyle={{ paddingTop: "20px" }} />
                                         <Bar dataKey="sales" name="売上高" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="opIncome" name="営業利益" fill="#10B981" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="netIncome" name="純利益" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="operating_income" name="営業利益" fill="#10B981" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="net_income" name="純利益" fill="#6366F1" radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
 
-                        {/* Recent Metrics Details Table */}
+                        {/* 直近の財務詳細: 最新の財務書類から抽出された全指標をタイル形式で表示 */}
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
                             <div className="p-6 border-b border-gray-100">
                                 <h3 className="text-lg font-bold text-gray-900 flex items-center">
@@ -340,19 +368,19 @@ const StockDetail = () => {
                             <div className="flex-1 overflow-auto bg-gray-50 p-6">
                                 <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-6">
                                     {Object.entries(documents[documents.length - 1].metrics || {}).map(([key, value]) => {
-                                        const isPercentage = ['roe', 'roa', 'equity_ratio', 'operating_margin'].includes(key);
+                                        const isPercentageMetric = ['roe', 'roa', 'equity_ratio', 'operating_margin'].includes(key);
                                         return (
-                                            <div key={key} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:border-primary/30 transition-colors">
+                                            <div key={key} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:border-blue-300 transition-colors">
                                                 <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate" title={key}>
-                                                    {METRIC_LABELS[key] || key.replace(/_/g, ' ')}
+                                                    {METRIC_DISPLAY_LABELS[key] || key.replace(/_/g, ' ')}
                                                 </dt>
                                                 <dd className="mt-1 flex items-baseline gap-1">
-                                                    <span className={`text-lg font-semibold ${isPercentage ? 'text-emerald-700' : 'text-gray-900'}`}>
-                                                        {isPercentage
+                                                    <span className={`text-lg font-semibold ${isPercentageMetric ? 'text-emerald-700' : 'text-gray-900'}`}>
+                                                        {isPercentageMetric
                                                             ? Number(value).toFixed(2)
                                                             : new Intl.NumberFormat('ja-JP').format(Number(value))}
                                                     </span>
-                                                    {isPercentage && <span className="text-sm font-medium text-gray-500">%</span>}
+                                                    {isPercentageMetric && <span className="text-sm font-medium text-gray-500">%</span>}
                                                 </dd>
                                             </div>
                                         )
@@ -373,15 +401,15 @@ const StockDetail = () => {
             )
             }
 
-            {/* Add to Portfolio Modal */}
+            {/* ポートフォリオ追加用モーダル */}
             {
-                showModal && (
+                showPortfolioModal && (
                     <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
                         <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowModal(false)}></div>
+                            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowPortfolioModal(false)}></div>
                             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
                             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                                <form onSubmit={handleAddToPortfolio}>
+                                <form onSubmit={handlePortfolioAdditionSubmit}>
                                     <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                                         <div className="sm:flex sm:items-start">
                                             <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
@@ -392,86 +420,79 @@ const StockDetail = () => {
                                                     <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
                                                         ポートフォリオに追加
                                                     </h3>
-                                                    <button type="button" onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-500">
+                                                    <button type="button" onClick={() => setShowPortfolioModal(false)} className="text-gray-400 hover:text-gray-500">
                                                         <X className="h-5 w-5" />
                                                     </button>
                                                 </div>
 
-                                                <div className="mt-4 space-y-4">
-                                                    {/* Select Portfolio */}
-                                                    <div>
-                                                        <label htmlFor="portfolio" className="block text-sm font-medium text-gray-700">対象ポートフォリオ *</label>
-                                                        {portfolios.length === 0 ? (
-                                                            <div className="mt-1 flex items-center text-sm text-yellow-600 bg-yellow-50 p-2 rounded">
-                                                                ポートフォリオがありません。先に作成が必要です。
+                                                 <div className="mt-4 space-y-4">
+                                                    {portfolioError && (
+                                                        <div className="p-3 bg-red-50 border-l-4 border-red-500 flex justify-between items-start">
+                                                            <div className="flex items-start">
+                                                                <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 mr-2" />
+                                                                <p className="text-xs text-red-700">{portfolioError}</p>
                                                             </div>
-                                                        ) : (
-                                                            <select
-                                                                id="portfolio"
-                                                                required
-                                                                value={selectedPortfolio}
-                                                                onChange={(e) => setSelectedPortfolio(Number(e.target.value))}
-                                                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                                                            >
-                                                                <option value="" disabled>-- 選択してください --</option>
-                                                                {portfolios.map(p => (
-                                                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Target Price */}
-                                                    <div>
-                                                        <label htmlFor="targetPrice" className="block text-sm font-medium text-gray-700">目標株価 (任意)</label>
-                                                        <div className="mt-1 relative rounded-md shadow-sm">
-                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                                <span className="text-gray-500 sm:text-sm">¥</span>
-                                                            </div>
-                                                            <input
-                                                                type="number"
-                                                                id="targetPrice"
-                                                                min="0"
-                                                                value={targetPrice}
-                                                                onChange={(e) => setTargetPrice(e.target.value ? Number(e.target.value) : '')}
-                                                                className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md py-2"
-                                                                placeholder="0"
-                                                            />
+                                                            <button type="button" onClick={() => setPortfolioError(null)} className="text-red-400 hover:text-red-600 font-bold ml-2">×</button>
                                                         </div>
-                                                    </div>
+                                                    )}
 
-                                                    {/* Notes */}
-                                                    <div>
-                                                        <label htmlFor="notes" className="block text-sm font-medium text-gray-700">メモ (任意)</label>
-                                                        <div className="mt-1">
-                                                            <textarea
-                                                                id="notes"
-                                                                rows={3}
-                                                                value={notes}
-                                                                onChange={(e) => setNotes(e.target.value)}
-                                                                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md py-2 px-3"
-                                                                placeholder="追加する理由など..."
-                                                            />
+                                                    {portfolioSuccess && (
+                                                        <div className="p-3 bg-green-50 border-l-4 border-green-500 flex items-center">
+                                                            <TrendingUp className="h-4 w-4 text-green-500 mr-2" />
+                                                            <p className="text-xs text-green-700 font-bold">ポートフォリオに追加しました！</p>
                                                         </div>
+                                                    )}
+                                                    {/* 入力フォームの各項目 */}
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700">対象ポートフォリオ</label>
+                                                        <select
+                                                            value={selectedPortfolioId}
+                                                            onChange={(e) => setSelectedPortfolioId(Number(e.target.value))}
+                                                            required
+                                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                                        >
+                                                            <option value="">選択してください</option>
+                                                            {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700">目標株価 (任意)</label>
+                                                        <input
+                                                            type="number"
+                                                            value={portfolioTargetPrice}
+                                                            onChange={(e) => setPortfolioTargetPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                                            placeholder="例: 5000"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700">メモ (任意)</label>
+                                                        <textarea
+                                                            value={portfolioNotes}
+                                                            onChange={(e) => setPortfolioNotes(e.target.value)}
+                                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                                            rows={3}
+                                                            placeholder="注目した理由など"
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end gap-3 flex-row-reverse sm:flex-row">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowModal(false)}
-                                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm"
-                                        >
-                                            キャンセル
-                                        </button>
+                                    <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                                         <button
                                             type="submit"
-                                            disabled={isSubmitting || portfolios.length === 0 || selectedPortfolio === ''}
-                                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                            disabled={isSubmittingPortfolio}
+                                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
                                         >
-                                            {isSubmitting ? '処理中...' : '追加する'}
+                                            {isSubmittingPortfolio ? '処理中...' : '追加する'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPortfolioModal(false)}
+                                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                                        >
+                                            キャンセル
                                         </button>
                                     </div>
                                 </form>
@@ -480,7 +501,7 @@ const StockDetail = () => {
                     </div>
                 )
             }
-        </div >
+        </div>
     );
 };
 
