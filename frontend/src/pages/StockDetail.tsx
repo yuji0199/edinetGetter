@@ -38,6 +38,22 @@ const METRIC_DISPLAY_LABELS: Record<string, string> = {
 };
 
 /**
+ * グラフのツールチップ表示用フォーマッタ。
+ * Recharts の value 型 (number | string | Array) と undefined を安全に処理する。
+ */
+const percentageFormatter = (value: number | string | readonly (number | string)[] | undefined): string => {
+    if (value === undefined || value === null) return '0%';
+    const numericValue = Array.isArray(value) ? Number(value[0]) : Number(value);
+    return `${numericValue}%`;
+};
+
+const currencyFormatter = (value: number | string | readonly (number | string)[] | undefined): string => {
+    if (value === undefined || value === null) return '¥0';
+    const numericValue = Array.isArray(value) ? Number(value[0]) : Number(value);
+    return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(numericValue);
+};
+
+/**
  * 銘柄詳細画面コンポーネント
  * 銘柄の基本情報、財務推移グラフ、成長性分析データを表示する
  */
@@ -288,7 +304,7 @@ const StockDetail = () => {
                                                 <YAxis axisLine={false} tickLine={false} unit="%" />
                                                 <Tooltip 
                                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                    formatter={(value: number) => [`${value}%`]}
+                                                    formatter={percentageFormatter}
                                                 />
                                                 <Legend wrapperStyle={{ paddingTop: "20px" }} />
                                                 <Line type="monotone" dataKey="sales_growth" name="売上高成長率" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
@@ -343,7 +359,7 @@ const StockDetail = () => {
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} />
                                         <YAxis tickFormatter={(value) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', notation: 'compact' }).format(value)} axisLine={false} tickLine={false} width={80} />
                                         <Tooltip
-                                            formatter={(value: number) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(Number(value))}
+                                            formatter={currencyFormatter}
                                             cursor={{ fill: '#F3F4F6' }}
                                         />
                                         <Legend wrapperStyle={{ paddingTop: "20px" }} />
