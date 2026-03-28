@@ -12,18 +12,18 @@ def read_stocks(skip: int = 0, limit: int = 100, db: Session = Depends(database.
     return stocks
 
 @router.get("/search", response_model=List[schemas.StockResponse])
-def search_stocks(query: str, db: Session = Depends(database.get_db)):
-    # Simple search: code starts with or company name contains
-    stocks = db.query(models.Stock).filter(
+def search_stocks(query: str = "", db: Session = Depends(database.get_db)):
+    """検索機能（衝突回避のため引数を任意に）"""
+    if not query: return []
+    return db.query(models.Stock).filter(
         (models.Stock.securities_code.like(f"{query}%")) |
         (models.Stock.company_name.like(f"%{query}%"))
     ).limit(10).all()
-    return stocks
 
 @router.get("/{securities_code}", response_model=schemas.StockDetailResponse)
 def read_stock(securities_code: str, db: Session = Depends(database.get_db)):
     stock = db.query(models.Stock).filter(models.Stock.securities_code == securities_code).first()
-    if stock is None:
+    if not stock:
         raise HTTPException(status_code=404, detail="Stock not found")
         
     current_price, per, pbr = None, None, None

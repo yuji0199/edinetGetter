@@ -20,9 +20,36 @@ const Dashboard = () => {
         }
     };
 
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [showResults, setShowResults] = useState(false);
+
     useEffect(() => {
         fetchDocuments();
     }, []);
+
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(async () => {
+            if (searchTerm.length >= 2) {
+                setIsSearching(true);
+                try {
+                    const res = await api.get(`/stocks/search?query=${searchTerm}`);
+                    setSearchResults(res.data);
+                    setShowResults(true);
+                } catch (error) {
+                    console.error("Search failed", error);
+                } finally {
+                    setIsSearching(false);
+                }
+            } else {
+                setSearchResults([]);
+                setShowResults(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm]);
 
     const handleSync = async () => {
         setIsSyncing(true);
@@ -65,17 +92,61 @@ const Dashboard = () => {
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {/* Search Card */}
-                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow relative">
                     <div className="p-6">
-                        <div className="flex items-center">
+                        <div className="flex items-center mb-4">
                             <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
                                 <Search className="h-6 w-6 text-blue-600" />
                             </div>
                             <div className="ml-4">
                                 <h3 className="text-lg font-medium text-gray-900">銘柄検索</h3>
-                                <p className="mt-1 text-sm text-gray-500">証券コードで企業を検索します。</p>
+                                <p className="mt-1 text-sm text-gray-500">コード4桁または企業名</p>
                             </div>
                         </div>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="例: 7203 または トヨタ"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onFocus={() => searchTerm.length >= 2 && setShowResults(true)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            />
+                            {isSearching && (
+                                <div className="absolute right-3 top-2.5">
+                                    <RefreshCw className="h-5 w-5 text-gray-400 animate-spin" />
+                                </div>
+                            )}
+                        </div>
+
+                        {showResults && searchResults.length > 0 && (
+                            <div className="absolute left-0 right-0 mt-2 mx-4 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                                <ul className="divide-y divide-gray-100">
+                                    {searchResults.map((stock) => (
+                                        <li key={stock.id}>
+                                            <Link 
+                                                to={`/stocks/${stock.securities_code}`}
+                                                className="block px-4 py-3 hover:bg-blue-50 transition-colors"
+                                                onClick={() => setShowResults(false)}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <span className="font-medium text-gray-900">{stock.company_name}</span>
+                                                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded">
+                                                        {stock.securities_code}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-gray-400 mt-1">{stock.industry}</div>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        {showResults && searchTerm.length >= 2 && !isSearching && searchResults.length === 0 && (
+                            <div className="absolute left-0 right-0 mt-2 mx-4 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-4 text-center text-sm text-gray-500">
+                                見つかりませんでした
+                            </div>
+                        )}
                     </div>
                 </div>
 
