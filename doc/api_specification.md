@@ -26,6 +26,7 @@
 * [API006] [銘柄検索](apis/stocks.md#api006)
 * [API007] [銘柄詳細・財務データ取得](apis/stocks.md#api007)
 * [API018] [成長性分析データの取得](apis/stocks.md#api018)
+* [API019] [銘柄検索 (Query)](apis/stocks.md#api019)
 
 ### 分析手法関連
 
