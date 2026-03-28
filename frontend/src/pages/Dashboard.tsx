@@ -92,7 +92,7 @@ const Dashboard = () => {
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {/* Search Card */}
-                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow relative">
+                <div className="bg-white shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow relative">
                     <div className="p-6">
                         <div className="flex items-center mb-4">
                             <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
@@ -151,10 +151,10 @@ const Dashboard = () => {
                 </div>
 
                 {/* Methods Card */}
-                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
+                <Link to="/analysis" className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow group">
                     <div className="p-6">
                         <div className="flex items-center">
-                            <div className="flex-shrink-0 bg-indigo-100 rounded-md p-3">
+                            <div className="flex-shrink-0 bg-indigo-100 rounded-md p-3 group-hover:bg-indigo-200 transition-colors">
                                 <Target className="h-6 w-6 text-indigo-600" />
                             </div>
                             <div className="ml-4">
@@ -163,13 +163,13 @@ const Dashboard = () => {
                             </div>
                         </div>
                     </div>
-                </div>
+                </Link>
 
                 {/* Portfolio Card */}
-                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
+                <Link to="/portfolios" className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow group">
                     <div className="p-6">
                         <div className="flex items-center">
-                            <div className="flex-shrink-0 bg-emerald-100 rounded-md p-3">
+                            <div className="flex-shrink-0 bg-emerald-100 rounded-md p-3 group-hover:bg-emerald-200 transition-colors">
                                 <TrendingUp className="h-6 w-6 text-emerald-600" />
                             </div>
                             <div className="ml-4">
@@ -178,7 +178,7 @@ const Dashboard = () => {
                             </div>
                         </div>
                     </div>
-                </div>
+                </Link>
             </div>
 
             <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
