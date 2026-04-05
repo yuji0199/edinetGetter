@@ -92,6 +92,7 @@
 | 5 | current_price | Number | リアルタイム株価（yfinanceより） |
 | 6 | per | Number | 株価 / EPS |
 | 7 | pbr | Number | 株価 / BPS |
+| 8 | accounting_standard | String | 適用されている会計基準（IFRS, J-GAAP等） |
 
 </div>
 
