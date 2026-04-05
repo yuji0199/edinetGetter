@@ -110,6 +110,27 @@ class XBRLParser:
                             metrics["period_start"] = context_dates[ctx]["start"]
                         break
 
+            # 2.5 Extract Accounting Standard
+            if "accounting_standard" not in metrics:
+                std_elements = soup.find_all("ix:nonNumeric", {"name": "jpdei_cor:AccountingStandardsAppliedDEI"})
+                if not std_elements:
+                    std_elements = soup.find_all("jpdei_cor:AccountingStandardsAppliedDEI")
+                
+                for el in std_elements:
+                    val = el.text.strip()
+                    val_lower = val.lower()
+                    if "ifrs" in val_lower or "国際財務報告基準" in val:
+                        metrics["accounting_standard"] = "IFRS"
+                    elif ("us" in val_lower and "gaap" in val_lower) or "米国" in val:
+                        metrics["accounting_standard"] = "US-GAAP"
+                    elif ("japan" in val_lower and "gaap" in val_lower) or "日本" in val:
+                        metrics["accounting_standard"] = "J-GAAP"
+                    elif "jmis" in val_lower or "修正国際基準" in val:
+                        metrics["accounting_standard"] = "JMIS"
+                        
+                    if "accounting_standard" in metrics:
+                        break
+
             # 3. Extract metrics
             for key, tags in targets.items():
                 if key in metrics:
@@ -141,7 +162,7 @@ class XBRLParser:
                         if "NonConsolidated" in context_ref:
                             score -= 5
                             
-                        candidate_values.append({"value": val, "score": score, "ctx": context_ref})
+                        candidate_values.append({"value": val, "score": score, "ctx": context_ref, "tag": tag})
                     except ValueError:
                         continue
                         
@@ -159,6 +180,15 @@ class XBRLParser:
                                 metrics["period_start"] = context_dates[ctx]["start"]
                             if "period_end" not in metrics and context_dates[ctx]["end"]:
                                 metrics["period_end"] = context_dates[ctx]["end"]
+                    
+                    # Infer accounting standard if not found
+                    if "accounting_standard" not in metrics and key == "net_sales":
+                        if "ifrs" in best["tag"].lower():
+                            metrics["accounting_standard"] = "IFRS"
+                        elif "jppfs" in best["tag"].lower():
+                            metrics["accounting_standard"] = "J-GAAP"
+                        elif "us-gaap" in best["tag"].lower():
+                            metrics["accounting_standard"] = "US-GAAP"
                     
         # Calculate derived metrics
         if metrics.get("net_assets") and metrics["net_assets"] > 0 and metrics.get("net_income") is not None:

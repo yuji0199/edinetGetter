@@ -43,6 +43,7 @@ class FinancialDocument(Base):
     operating_cf = Column(Float, nullable=True)
     investing_cf = Column(Float, nullable=True)
     financing_cf = Column(Float, nullable=True)
+    accounting_standard = Column(String(50), nullable=True)
     metrics_json = Column(Text) # Store parsed XBRL metrics
     
     stock = relationship("Stock")

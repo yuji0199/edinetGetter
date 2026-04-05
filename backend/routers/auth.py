@@ -11,6 +11,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 def get_user_by_username(db: Session, username: str):
     return db.query(models.User).filter(models.User.username == username).first()
 
+def get_user_by_email(db: Session, email: str):
+    return db.query(models.User).filter(models.User.email == email).first()
+
 def get_current_user(db: Session = Depends(database.get_db), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -35,6 +38,10 @@ def register(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     db_user = get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+        
+    db_email = get_user_by_email(db, email=user.email)
+    if db_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
     hashed_password = auth.get_password_hash(user.password)
     new_user = models.User(username=user.username, email=user.email, hashed_password=hashed_password)

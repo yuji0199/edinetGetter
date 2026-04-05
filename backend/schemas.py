@@ -55,6 +55,7 @@ class FinancialDocumentBase(BaseModel):
     operating_cf: Optional[float] = None
     investing_cf: Optional[float] = None
     financing_cf: Optional[float] = None
+    accounting_standard: Optional[str] = None
     metrics_json: Optional[str] = None
 
 class FinancialDocumentResponse(FinancialDocumentBase):

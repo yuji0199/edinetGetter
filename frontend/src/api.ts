@@ -88,6 +88,7 @@ export interface StockDocument {
     period_start?: string;
     period_end?: string;
     submit_datetime: string;
+    accounting_standard?: string;
     metrics_json?: string;
     metrics?: Record<string, number>;
 }

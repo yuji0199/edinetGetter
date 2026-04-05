@@ -157,6 +157,26 @@ const StockDetail = () => {
         };
     });
 
+    // 最新のドキュメントから会計基準を取得
+    const latestDocument = documents.length > 0 ? documents[documents.length - 1] : null;
+    const accountingStandard = latestDocument?.accounting_standard || 'J-GAAP';
+    const isIFRS = accountingStandard === 'IFRS';
+    
+    // IFRS向け動的ラベル変換関数
+    const getMetricLabel = (key: string, isIFRS: boolean) => {
+        const baseLabel = METRIC_DISPLAY_LABELS[key] || key.replace(/_/g, ' ');
+        if (!isIFRS) return baseLabel;
+        
+        switch (key) {
+            case 'net_sales': return '売上収益';
+            case 'operating_income': return '営業利益/損失';
+            case 'ordinary_income': return '経常利益 (税引前利益)';
+            case 'net_income': return '親会社の所有者に帰属する当期利益';
+            case 'net_assets': return '資本';
+            default: return baseLabel;
+        }
+    };
+
     /**
      * ポートフォリオへの新規追加処理。
      * バリデーション後にAPIを呼び出し、成功時はフォームをリセットする。
@@ -213,6 +233,13 @@ const StockDetail = () => {
                                     <span className="flex items-center">
                                         <TrendingUp className="mr-1.5 h-4 w-4" />
                                         {stock.industry}
+                                    </span>
+                                )}
+                                {documents.length > 0 && (
+                                    <span className={`px-2.5 py-0.5 rounded-full font-bold text-xs ${
+                                        isIFRS ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-slate-100 text-slate-800 border border-slate-200'
+                                    }`}>
+                                        {accountingStandard}
                                     </span>
                                 )}
                             </div>
@@ -339,7 +366,7 @@ const StockDetail = () => {
                                             { key: 'fcf_growth', val: growth.series[0].fcf_growth },
                                         ].map(item => (
                                             <div key={item.key} className="flex justify-between items-center p-3 rounded-lg bg-gray-50 border border-gray-100">
-                                                <span className="text-sm text-gray-600">{METRIC_DISPLAY_LABELS[item.key]}</span>
+                                                <span className="text-sm text-gray-600">{getMetricLabel(item.key.replace('_growth', ''), isIFRS)}成長率</span>
                                                 <span className={`text-sm font-bold ${Number(item.val) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                                     {item.val >= 0 ? '+' : ''}{item.val}%
                                                 </span>
@@ -370,9 +397,9 @@ const StockDetail = () => {
                                             cursor={{ fill: '#F3F4F6' }}
                                         />
                                         <Legend wrapperStyle={{ paddingTop: "20px" }} />
-                                        <Bar dataKey="sales" name="売上高" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="operating_income" name="営業利益" fill="#10B981" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="net_income" name="純利益" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="sales" name={isIFRS ? "売上収益" : "売上高"} fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="operating_income" name={isIFRS ? "営業利益/損失" : "営業利益"} fill="#10B981" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="net_income" name={isIFRS ? "親会社の所有者に帰属する当期利益" : "純利益"} fill="#6366F1" radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -397,7 +424,7 @@ const StockDetail = () => {
                                         return (
                                             <div key={key} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:border-blue-300 transition-colors">
                                                 <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate" title={key}>
-                                                    {METRIC_DISPLAY_LABELS[key] || key.replace(/_/g, ' ')}
+                                                    {getMetricLabel(key, isIFRS)}
                                                 </dt>
                                                 <dd className="mt-1 flex items-baseline gap-1">
                                                     <span className={`text-lg font-semibold ${isPercentageMetric ? 'text-emerald-700' : 'text-gray-900'}`}>
