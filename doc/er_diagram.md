@@ -27,7 +27,19 @@ erDiagram
         DateTime period_start
         DateTime period_end
         DateTime submit_datetime
-        Text metrics_json
+        Float net_sales "売上高"
+        Float operating_income "営業利益"
+        Float ordinary_income "経常利益"
+        Float net_income "当期純利益"
+        Float total_assets "総資産"
+        Float net_assets "純資産"
+        Float equity_ratio "自己資本比率"
+        Float roe "ROE"
+        Float roa "ROA"
+        Float operating_cf "営業CF"
+        Float investing_cf "投資CF"
+        Float financing_cf "財務CF"
+        Text metrics_json "その他の動的指標"
     }
 
     analysis_methods {

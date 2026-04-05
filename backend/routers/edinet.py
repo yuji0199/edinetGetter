@@ -93,6 +93,18 @@ def run_full_sync(target_date: date):
                     period_start=period_start,
                     period_end=period_end,
                     submit_datetime=submit_dt,
+                    net_sales=metrics.get("net_sales"),
+                    operating_income=metrics.get("operating_income"),
+                    ordinary_income=metrics.get("ordinary_income"),
+                    net_income=metrics.get("net_income"),
+                    total_assets=metrics.get("total_assets"),
+                    net_assets=metrics.get("net_assets"),
+                    equity_ratio=metrics.get("equity_ratio"),
+                    roe=metrics.get("roe"),
+                    roa=metrics.get("roa"),
+                    operating_cf=metrics.get("operating_cf"),
+                    investing_cf=metrics.get("investing_cf"),
+                    financing_cf=metrics.get("financing_cf"),
                     metrics_json=json.dumps(metrics)
                 )
                 db.add(new_doc)

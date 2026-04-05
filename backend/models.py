@@ -31,6 +31,18 @@ class FinancialDocument(Base):
     period_start = Column(DateTime(timezone=True))
     period_end = Column(DateTime(timezone=True))
     submit_datetime = Column(DateTime(timezone=True)) # Document submission/issue date
+    net_sales = Column(Float, nullable=True)
+    operating_income = Column(Float, nullable=True)
+    ordinary_income = Column(Float, nullable=True)
+    net_income = Column(Float, nullable=True)
+    total_assets = Column(Float, nullable=True)
+    net_assets = Column(Float, nullable=True)
+    equity_ratio = Column(Float, nullable=True)
+    roe = Column(Float, nullable=True)
+    roa = Column(Float, nullable=True)
+    operating_cf = Column(Float, nullable=True)
+    investing_cf = Column(Float, nullable=True)
+    financing_cf = Column(Float, nullable=True)
     metrics_json = Column(Text) # Store parsed XBRL metrics
     
     stock = relationship("Stock")

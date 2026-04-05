@@ -390,7 +390,9 @@ const StockDetail = () => {
                             </div>
                             <div className="flex-1 overflow-auto bg-gray-50 p-6">
                                 <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-6">
-                                    {Object.entries(documents[documents.length - 1].metrics || {}).map(([key, value]) => {
+                                    {Object.entries(documents[documents.length - 1].metrics || {})
+                                        .filter(([key, value]) => !['period_start', 'period_end'].includes(key) && value !== null)
+                                        .map(([key, value]) => {
                                         const isPercentageMetric = ['roe', 'roa', 'equity_ratio', 'operating_margin'].includes(key);
                                         return (
                                             <div key={key} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:border-blue-300 transition-colors">

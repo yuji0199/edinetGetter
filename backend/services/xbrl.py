@@ -151,12 +151,14 @@ class XBRLParser:
                     best = candidate_values[0]
                     metrics[key] = best["value"]
                     
-                    # Store dates as fallback if DEI failed
-                    if key in ["net_sales", "net_income"] and "period_end" not in metrics:
+                    # Store dates as fallback if missing
+                    if key in ["net_sales", "net_income"]:
                         ctx = best["ctx"]
                         if ctx in context_dates:
-                            metrics["period_start"] = context_dates[ctx]["start"]
-                            metrics["period_end"] = context_dates[ctx]["end"]
+                            if "period_start" not in metrics and context_dates[ctx]["start"]:
+                                metrics["period_start"] = context_dates[ctx]["start"]
+                            if "period_end" not in metrics and context_dates[ctx]["end"]:
+                                metrics["period_end"] = context_dates[ctx]["end"]
                     
         # Calculate derived metrics
         if metrics.get("net_assets") and metrics["net_assets"] > 0 and metrics.get("net_income") is not None:

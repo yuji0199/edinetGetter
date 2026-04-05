@@ -43,6 +43,18 @@ class FinancialDocumentBase(BaseModel):
     period_start: Optional[datetime] = None
     period_end: Optional[datetime] = None
     submit_datetime: Optional[datetime] = None
+    net_sales: Optional[float] = None
+    operating_income: Optional[float] = None
+    ordinary_income: Optional[float] = None
+    net_income: Optional[float] = None
+    total_assets: Optional[float] = None
+    net_assets: Optional[float] = None
+    equity_ratio: Optional[float] = None
+    roe: Optional[float] = None
+    roa: Optional[float] = None
+    operating_cf: Optional[float] = None
+    investing_cf: Optional[float] = None
+    financing_cf: Optional[float] = None
     metrics_json: Optional[str] = None
 
 class FinancialDocumentResponse(FinancialDocumentBase):
