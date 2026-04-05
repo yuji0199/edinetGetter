@@ -142,13 +142,20 @@ const StockDetail = () => {
      * 財務推移棒グラフ用のデータ整形。
      * 古い順に表示するために、APIから取得したデータをそのままの順序で変換。
      */
-    const barChartFormattedData = documents.map(document => ({
-        name: document.doc_id,
-        sales: document.metrics?.net_sales || 0,
-        operating_income: document.metrics?.operating_income || 0,
-        ordinary_income: document.metrics?.ordinary_income || 0,
-        net_income: document.metrics?.net_income || 0,
-    }));
+    const barChartFormattedData = documents.map(document => {
+        // period_end (例: "2023-03-31") から西暦を抽出し「2023年度」形式にする。
+        // period_end が存在しない場合は doc_id をフォールバックとして使用。
+        const year = document.period_end ? document.period_end.substring(0, 4) : '';
+        const label = year ? `${year}年度` : document.doc_id;
+        
+        return {
+            name: label,
+            sales: document.metrics?.net_sales || 0,
+            operating_income: document.metrics?.operating_income || 0,
+            ordinary_income: document.metrics?.ordinary_income || 0,
+            net_income: document.metrics?.net_income || 0,
+        };
+    });
 
     /**
      * ポートフォリオへの新規追加処理。

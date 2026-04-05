@@ -84,7 +84,33 @@ class XBRLParser:
                 elif instant:
                     context_dates[ctx_id] = {"start": None, "end": instant.text}
 
-            # 2. Extract metrics
+            # 2. Extract DEI (Document and Entity Information) for dates
+            dei_tags = [
+                "jpdei_cor:CurrentPeriodEndDateDEI",
+                "jpdei_cor:CurrentFiscalYearEndDateDEI",
+                "jpdei_cor:FilingDateDEI",
+                "jpcrp_cor:CurrentPeriodEndDateDEI",
+                "jpcrp_cor:CurrentFiscalYearEndDateDEI"
+            ]
+
+            for tag in dei_tags:
+                if "period_end" in metrics:
+                    break
+                    
+                elements = soup.find_all("ix:nonNumeric", {"name": tag})
+                if not elements:
+                    elements = soup.find_all(tag)
+                
+                for el in elements:
+                    val = el.text.strip()
+                    if re.match(r"\d{4}-\d{2}-\d{2}", val):
+                        metrics["period_end"] = val
+                        ctx = el.get("contextRef", "")
+                        if ctx in context_dates:
+                            metrics["period_start"] = context_dates[ctx]["start"]
+                        break
+
+            # 3. Extract metrics
             for key, tags in targets.items():
                 if key in metrics:
                     continue # Already found the best value for this metric
@@ -125,7 +151,7 @@ class XBRLParser:
                     best = candidate_values[0]
                     metrics[key] = best["value"]
                     
-                    # Store dates if this is a primary metric (NetSales or NetIncome)
+                    # Store dates as fallback if DEI failed
                     if key in ["net_sales", "net_income"] and "period_end" not in metrics:
                         ctx = best["ctx"]
                         if ctx in context_dates:
