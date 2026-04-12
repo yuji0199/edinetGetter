@@ -47,10 +47,35 @@ const percentageFormatter = (value: number | string | readonly (number | string)
     return `${numericValue}%`;
 };
 
-const currencyFormatter = (value: number | string | readonly (number | string)[] | undefined): string => {
+/**
+ * 日本語の大きな金額（スケール）を考慮したフォーマッタ。
+ * 例: 29兆円, 450億円, 15百万円
+ */
+const formatJapaneseCurrency = (value: number | string | readonly (number | string)[] | undefined): string => {
     if (value === undefined || value === null) return '¥0';
-    const numericValue = Array.isArray(value) ? Number(value[0]) : Number(value);
-    return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(numericValue);
+    const num = Array.isArray(value) ? Number(value[0]) : Number(value);
+    
+    // EPSやBPSのような比較的小さい指標（1株あたり情報など）の場合
+    if (Math.abs(num) < 10000 && num % 1 !== 0) {
+        return `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 2 }).format(num)}`;
+    }
+    
+    if (Math.abs(num) >= 1_0000_0000_0000) {
+        return `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 2 }).format(num / 1_0000_0000_0000)}兆`;
+    } else if (Math.abs(num) >= 1_0000_0000) {
+        return `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(num / 1_0000_0000)}億`;
+    } else if (Math.abs(num) >= 100_0000) {
+        return `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(num / 100_0000)}百万`;
+    }
+    
+    return `¥${new Intl.NumberFormat('ja-JP').format(num)}`;
+};
+
+/**
+ * ツールチップ用フォーマッタ
+ */
+const currencyFormatter = (value: number | string | readonly (number | string)[] | undefined): string => {
+    return formatJapaneseCurrency(value);
 };
 
 /**
@@ -143,10 +168,17 @@ const StockDetail = () => {
      * 古い順に表示するために、APIから取得したデータをそのままの順序で変換。
      */
     const barChartFormattedData = documents.map(document => {
-        // period_end (例: "2023-03-31") から西暦を抽出し「2023年度」形式にする。
-        // period_end が存在しない場合は doc_id をフォールバックとして使用。
-        const year = document.period_end ? document.period_end.substring(0, 4) : '';
+        // period_end (例: "2023-03-31") から決算月を加味して年度(FY)を算出する
+        const getFiscalYear = (dateStr: string) => {
+            if (!dateStr) return '';
+            const [yearStr, monthStr] = dateStr.split('-');
+            const year = parseInt(yearStr, 10);
+            const month = parseInt(monthStr, 10);
+            return month <= 3 ? String(year - 1) : String(year);
+        };
+        const year = getFiscalYear(document.period_end || '');
         const label = year ? `${year}年度` : document.doc_id;
+
         
         return {
             name: label,
@@ -391,7 +423,7 @@ const StockDetail = () => {
                                     <BarChart data={barChartFormattedData} margin={{ top: 10, right: 10, left: 40, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                        <YAxis tickFormatter={(value) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', notation: 'compact' }).format(value)} axisLine={false} tickLine={false} width={80} />
+                                        <YAxis tickFormatter={(value) => formatJapaneseCurrency(value)} axisLine={false} tickLine={false} width={80} />
                                         <Tooltip
                                             formatter={currencyFormatter}
                                             cursor={{ fill: '#F3F4F6' }}
@@ -418,7 +450,7 @@ const StockDetail = () => {
                             <div className="flex-1 overflow-auto bg-gray-50 p-6">
                                 <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-6">
                                     {Object.entries(documents[documents.length - 1].metrics || {})
-                                        .filter(([key, value]) => !['period_start', 'period_end'].includes(key) && value !== null)
+                                        .filter(([key, value]) => !['period_start', 'period_end', 'accounting_standard'].includes(key) && value !== null)
                                         .map(([key, value]) => {
                                         const isPercentageMetric = ['roe', 'roa', 'equity_ratio', 'operating_margin'].includes(key);
                                         return (
@@ -430,7 +462,7 @@ const StockDetail = () => {
                                                     <span className={`text-lg font-semibold ${isPercentageMetric ? 'text-emerald-700' : 'text-gray-900'}`}>
                                                         {isPercentageMetric
                                                             ? Number(value).toFixed(2)
-                                                            : new Intl.NumberFormat('ja-JP').format(Number(value))}
+                                                            : formatJapaneseCurrency(value)}
                                                     </span>
                                                     {isPercentageMetric && <span className="text-sm font-medium text-gray-500">%</span>}
                                                 </dd>

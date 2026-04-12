@@ -21,12 +21,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger("batch_sync")
 
-def batch_sync(years=2, days=None, throttle=1.0, force=True):
+def batch_sync(years=2, days=None, start=None, end=None, throttle=1.0, force=True):
     """
     Sync EDINET data for a range of dates.
     """
-    end_date = date.today()
-    if days:
+    if end:
+        end_date = datetime.strptime(end, "%Y-%m-%d").date()
+    else:
+        end_date = date.today()
+
+    if start:
+        start_date = datetime.strptime(start, "%Y-%m-%d").date()
+    elif days:
         start_date = end_date - timedelta(days=days)
     else:
         start_date = end_date - timedelta(days=years * 365)
@@ -62,9 +68,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EDINET Batch Sync Job")
     parser.add_argument("--years", type=int, default=2, help="Number of years to go back")
     parser.add_argument("--days", type=int, help="Number of days to go back (overrides --years)")
+    parser.add_argument("--start", type=str, help="Start date (YYYY-MM-DD)")
+    parser.add_argument("--end", type=str, help="End date (YYYY-MM-DD)")
     parser.add_argument("--throttle", type=float, default=1.0, help="Seconds to wait between calls")
     parser.add_argument("--no-force", action="store_false", dest="force", help="Don't force sync (respect time windows)")
     
     args = parser.parse_args()
     
-    batch_sync(years=args.years, days=args.days, throttle=args.throttle, force=args.force)
+    batch_sync(years=args.years, days=args.days, start=args.start, end=args.end, throttle=args.throttle, force=args.force)

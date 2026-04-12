@@ -46,9 +46,15 @@ def calculate_growth_for_stock(db: Session, stock_id: int, years: int = 5) -> Gr
     
     for doc in docs:
         metrics = json.loads(doc.metrics_json) if doc.metrics_json else {}
-        # 報告日ではなく、実際の決算期末日を基準として年度を特定する
+        # 報告日ではなく、実際の決算期末日を基準として年度（FY）を特定する
         reference_date = doc.period_end or doc.submit_datetime
-        year_string = str(reference_date.year) if reference_date else "Unknown"
+        if reference_date:
+            if reference_date.month <= 3:
+                year_string = str(reference_date.year - 1)
+            else:
+                year_string = str(reference_date.year)
+        else:
+            year_string = "Unknown"
         
         if year_string not in seen_years:
             seen_years.add(year_string)

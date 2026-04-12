@@ -153,6 +153,16 @@ class XBRLParser:
                     
                     try:
                         val = float(val_str)
+                        scale = el.get("scale")
+                        if scale:
+                            try:
+                                val *= (10 ** int(scale))
+                            except ValueError:
+                                pass
+                        
+                        if el.get("sign") == "-":
+                            val = -abs(val)
+                            
                         if "Prior" in context_ref:
                             continue
                             
