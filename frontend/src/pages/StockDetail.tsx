@@ -121,10 +121,33 @@ const StockDetail = () => {
                 setGrowth(growthRes.data);
 
                 // metrics_jsonをパースして型定義済みのオブジェクトとして扱う
-                const formattedDocuments = docsRes.data.map((document) => ({
+                const rawDocuments = docsRes.data.map((document) => ({
                     ...document,
                     metrics: document.metrics_json ? JSON.parse(document.metrics_json) : {}
                 }));
+
+                // 決算年度（FY）ごとに最新の提出書類だけを残すように重複排除
+                const groupedByFY = rawDocuments.reduce((acc, doc) => {
+                    const dateStr = doc.period_end || '';
+                    if (!dateStr) {
+                        acc[doc.doc_id] = doc;
+                        return acc;
+                    }
+                    const [yearStr, monthStr] = dateStr.split('-');
+                    const year = parseInt(yearStr, 10);
+                    const month = parseInt(monthStr, 10);
+                    const fy = month <= 3 ? year - 1 : year;
+                    
+                    if (!acc[fy] || new Date(doc.submit_datetime) > new Date(acc[fy].submit_datetime)) {
+                        acc[fy] = doc;
+                    }
+                    return acc;
+                }, {} as Record<string, typeof rawDocuments[0]>);
+                
+                const formattedDocuments = Object.values(groupedByFY).sort((a, b) => 
+                    new Date(a.period_end || '').getTime() - new Date(b.period_end || '').getTime()
+                );
+
                 setDocuments(formattedDocuments);
                 setError(null);
             } catch (err: unknown) {
