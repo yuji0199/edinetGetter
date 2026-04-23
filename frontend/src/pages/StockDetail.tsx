@@ -113,6 +113,9 @@ const StockDetail = () => {
     const [newNoteContent, setNewNoteContent] = useState<string>('');
     const [isSubmittingNote, setIsSubmittingNote] = useState<boolean>(false);
     const [noteError, setNoteError] = useState<string | null>(null);
+    const [newNoteImage, setNewNoteImage] = useState<File | null>(null);
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
     useEffect(() => {
         /**
@@ -343,15 +346,36 @@ const StockDetail = () => {
         setIsSubmittingNote(true);
         setNoteError(null);
         try {
+            const formData = new FormData();
+            formData.append("content", newNoteContent);
+            if (newNoteImage) {
+                formData.append("image", newNoteImage);
+            }
+
             const api = await import('../api');
-            const res = await api.addStockNote(code, { content: newNoteContent });
+            const res = await api.addStockNote(code, formData);
             setNotes(prev => [res.data, ...prev]);
             setNewNoteContent('');
+            setNewNoteImage(null);
+            setPreviewImageUrl(null);
         } catch (err: any) {
             setNoteError(err.response?.data?.detail || 'メモの保存に失敗しました。');
         } finally {
             setIsSubmittingNote(false);
         }
+    };
+
+    const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setNewNoteImage(file);
+            setPreviewImageUrl(URL.createObjectURL(file));
+        }
+    };
+
+    const handleClearImage = () => {
+        setNewNoteImage(null);
+        setPreviewImageUrl(null);
     };
 
     /**
@@ -630,13 +654,29 @@ const StockDetail = () => {
                                 value={newNoteContent}
                                 onChange={(e) => setNewNoteContent(e.target.value)}
                                 placeholder="決算の所感や関連ニュース、投資判断のメモを書き残しましょう..."
-                                className="w-full border border-gray-300 rounded-lg shadow-sm p-4 text-sm focus:ring-blue-500 focus:border-blue-500 mb-3"
+                                className="w-full border border-gray-300 rounded-lg shadow-sm p-4 text-sm focus:ring-blue-500 focus:border-blue-500 mb-2"
                                 rows={3}
                             />
+                            {previewImageUrl && (
+                                <div className="relative inline-block mb-3">
+                                    <img src={previewImageUrl} alt="preview" className="h-32 rounded border border-gray-200 object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={handleClearImage}
+                                        className="absolute -top-2 -right-2 bg-white text-gray-500 rounded-full border border-gray-200 p-1 hover:text-red-500 shadow"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            )}
                             {noteError && (
                                 <p className="text-red-500 text-xs mb-3">{noteError}</p>
                             )}
-                            <div className="flex justify-end">
+                            <div className="flex justify-between items-center">
+                                <label className="cursor-pointer inline-flex items-center text-sm text-gray-600 hover:text-blue-600">
+                                    <span className="mr-2">📷 画像を添付</span>
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
+                                </label>
                                 <button
                                     type="submit"
                                     disabled={isSubmittingNote || !newNoteContent.trim()}
@@ -662,7 +702,12 @@ const StockDetail = () => {
                                             <X className="h-4 w-4" />
                                         </button>
                                     </div>
-                                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.content}</p>
+                                    <p className="text-sm text-gray-800 whitespace-pre-wrap mb-2">{note.content}</p>
+                                    {note.image_path && (
+                                        <div className="mt-2 cursor-pointer" onClick={() => setLightboxImage('http://localhost:8000' + note.image_path)}>
+                                            <img src={'http://localhost:8000' + note.image_path} alt="note attached figure" className="max-h-48 rounded border border-gray-200 object-cover hover:opacity-90 transition-opacity" />
+                                        </div>
+                                    )}
                                 </div>
                             )) : (
                                 <p className="text-sm text-gray-500 text-center py-4">まだメモがありません。</p>
@@ -904,6 +949,22 @@ const StockDetail = () => {
                     </div>
                 )
             }
+
+            {/* メモ画像拡大用 Lightbox モーダル */}
+            {lightboxImage && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-90 transition-opacity" onClick={() => setLightboxImage(null)}>
+                    <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-8">
+                        <button
+                            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 bg-black bg-opacity-50 rounded-full"
+                            onClick={() => setLightboxImage(null)}
+                            title="閉じる"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                        <img src={lightboxImage} alt="Expanded view" className="max-w-full max-h-full object-contain rounded shadow-2xl" onClick={(e) => e.stopPropagation()} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -164,12 +164,17 @@ export interface UserStockNote {
     user_id?: number;
     stock_id?: number;
     content: string;
+    image_path?: string;
     created_at?: string;
     updated_at?: string;
 }
 
 export const getStockNotes = (securitiesCode: string) => api.get<UserStockNote[]>(`/stocks/${securitiesCode}/notes`);
-export const addStockNote = (securitiesCode: string, data: { content: string }) => api.post<UserStockNote>(`/stocks/${securitiesCode}/notes`, data);
+export const addStockNote = (securitiesCode: string, data: FormData) => api.post<UserStockNote>(`/stocks/${securitiesCode}/notes`, data, {
+    headers: {
+        'Content-Type': 'multipart/form-data'
+    }
+});
 export const deleteStockNote = (securitiesCode: string, noteId: number) => api.delete(`/stocks/${securitiesCode}/notes/${noteId}`);
 
 export default api;

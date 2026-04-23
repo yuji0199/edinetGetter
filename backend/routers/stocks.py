@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
 from sqlalchemy.orm import Session, joinedload
 from typing import List
+import os
+import uuid
 import models, schemas, database
 from routers.auth import get_current_user
 
@@ -140,15 +142,28 @@ def get_user_stock_notes(securities_code: str, db: Session = Depends(database.ge
     return notes
 
 @router.post("/{securities_code}/notes", response_model=schemas.UserStockNoteResponse)
-def create_user_stock_note(securities_code: str, note_data: schemas.UserStockNoteCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
+def create_user_stock_note(securities_code: str, content: str = Form(...), image: UploadFile = File(None), db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
     stock = db.query(models.Stock).filter(models.Stock.securities_code == securities_code).first()
     if not stock:
         raise HTTPException(status_code=404, detail="Stock not found")
         
+    image_path = None
+    if image and image.filename:
+        # Save the uploaded file to backend/uploads
+        ext = os.path.splitext(image.filename)[1]
+        filename = f"{uuid.uuid4().hex}{ext}"
+        filepath = os.path.join("uploads", filename)
+        
+        with open(filepath, "wb") as buffer:
+            buffer.write(image.file.read())
+            
+        image_path = f"/uploads/{filename}"
+
     new_note = models.UserStockNote(
         user_id=current_user.id,
         stock_id=stock.id,
-        content=note_data.content
+        content=content,
+        image_path=image_path
     )
     db.add(new_note)
     db.commit()
