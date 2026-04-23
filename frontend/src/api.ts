@@ -143,4 +143,20 @@ export const deletePortfolio = (id: number) => api.delete(`/portfolios/${id}`);
 export const addPortfolioItem = (portfolioId: number, data: PortfolioItemCreate) => api.post<PortfolioItem>(`/portfolios/${portfolioId}/items`, data);
 export const deletePortfolioItem = (portfolioId: number, itemId: number) => api.delete(`/portfolios/${portfolioId}/items/${itemId}`);
 
+export interface UserStockForecast {
+    id?: number;
+    user_id?: number;
+    stock_id?: number;
+    target_year?: string;
+    forecast_net_sales?: number;
+    forecast_operating_income?: number;
+    forecast_ordinary_income?: number;
+    forecast_net_income?: number;
+    forecast_eps?: number;
+    updated_at?: string;
+}
+
+export const getStockForecast = (securitiesCode: string) => api.get<UserStockForecast>(`/stocks/${securitiesCode}/forecast`);
+export const saveStockForecast = (securitiesCode: string, forecastData: UserStockForecast) => api.put<UserStockForecast>(`/stocks/${securitiesCode}/forecast`, forecastData);
+
 export default api;

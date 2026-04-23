@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Building2, TrendingUp, BarChart3, Clock, AlertCircle, FolderPlus, X, LineChart as LineChartIcon, Zap } from 'lucide-react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, LineChart, Line } from 'recharts';
-import { getStockGrowth, addPortfolioItem, getPortfolios, getStock, getStockDocuments } from '../api';
-import type { Portfolio, GrowthAnalysisResponse, Stock, StockDocument } from '../api';
+import { getStockGrowth, addPortfolioItem, getPortfolios, getStock, getStockDocuments, getStockForecast, saveStockForecast } from '../api';
+import type { Portfolio, GrowthAnalysisResponse, Stock, StockDocument, UserStockForecast } from '../api';
 
 /**
  * 財務指標の表示名マッピング
@@ -87,6 +87,7 @@ const StockDetail = () => {
     const [stock, setStock] = useState<Stock | null>(null);
     const [documents, setDocuments] = useState<StockDocument[]>([]);
     const [growth, setGrowth] = useState<GrowthAnalysisResponse | null>(null);
+    const [forecast, setForecast] = useState<UserStockForecast | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -100,6 +101,13 @@ const StockDetail = () => {
     const [portfolioError, setPortfolioError] = useState<string | null>(null);
     const [portfolioSuccess, setPortfolioSuccess] = useState<boolean>(false);
 
+    // 会社業績予想追加用モーダルの状態管理
+    const [showForecastModal, setShowForecastModal] = useState<boolean>(false);
+    const [forecastFormData, setForecastFormData] = useState<UserStockForecast>({});
+    const [isSubmittingForecast, setIsSubmittingForecast] = useState<boolean>(false);
+    const [forecastError, setForecastError] = useState<string | null>(null);
+    const [forecastSuccess, setForecastSuccess] = useState<boolean>(false);
+
     useEffect(() => {
         /**
          * 銘柄の詳細情報、財務書類、ポートフォリオ一覧、成長性データを一括で取得する
@@ -109,25 +117,32 @@ const StockDetail = () => {
             try {
                 setLoading(true);
                 // 並列実行により初期ロード時間を短縮する意図
-                const [stockRes, docsRes, portRes, growthRes] = await Promise.all([
+                const [stockRes, docsRes, portRes, growthRes, forecastRes] = await Promise.allSettled([
                     getStock(code),
                     getStockDocuments(code),
                     getPortfolios(),
-                    getStockGrowth(code)
+                    getStockGrowth(code),
+                    getStockForecast(code)
                 ]);
                 
-                setStock(stockRes.data);
-                setPortfolios(portRes.data);
-                setGrowth(growthRes.data);
+                if (stockRes.status === "fulfilled") setStock(stockRes.value.data);
+                if (portRes.status === "fulfilled") setPortfolios(portRes.value.data);
+                if (growthRes.status === "fulfilled") setGrowth(growthRes.value.data);
+                
+                if (forecastRes.status === "fulfilled" && forecastRes.value.data) {
+                    setForecast(forecastRes.value.data);
+                    setForecastFormData(forecastRes.value.data);
+                }
 
                 // metrics_jsonをパースして型定義済みのオブジェクトとして扱う
-                const rawDocuments = docsRes.data.map((document) => ({
+                if (docsRes.status === "fulfilled") {
+                const rawDocuments = docsRes.value.data.map((document: StockDocument) => ({
                     ...document,
                     metrics: document.metrics_json ? JSON.parse(document.metrics_json) : {}
                 }));
 
                 // 決算年度（FY）ごとに最新の提出書類だけを残すように重複排除
-                const groupedByFY = rawDocuments.reduce((acc, doc) => {
+                const groupedByFY = rawDocuments.reduce((acc: Record<string, typeof rawDocuments[0]>, doc: typeof rawDocuments[0]) => {
                     const dateStr = doc.period_end || '';
                     if (!dateStr) {
                         acc[doc.doc_id] = doc;
@@ -142,13 +157,14 @@ const StockDetail = () => {
                         acc[fy] = doc;
                     }
                     return acc;
-                }, {} as Record<string, typeof rawDocuments[0]>);
+                }, {});
                 
-                const formattedDocuments = Object.values(groupedByFY).sort((a, b) => 
+                const formattedDocuments = Object.values(groupedByFY).sort((a: any, b: any) => 
                     new Date(a.period_end || '').getTime() - new Date(b.period_end || '').getTime()
                 );
 
-                setDocuments(formattedDocuments);
+                setDocuments(formattedDocuments as StockDocument[]);
+                }
                 setError(null);
             } catch (err: unknown) {
                 console.error("銘柄データの取得に失敗しました", err);
@@ -212,6 +228,16 @@ const StockDetail = () => {
         };
     });
 
+    if (forecast && (forecast.forecast_net_sales || forecast.forecast_net_income || forecast.forecast_operating_income)) {
+        barChartFormattedData.push({
+            name: forecast.target_year ? `${forecast.target_year} (予)` : "会社予想",
+            sales: forecast.forecast_net_sales || 0,
+            operating_income: forecast.forecast_operating_income || 0,
+            ordinary_income: forecast.forecast_ordinary_income || 0,
+            net_income: forecast.forecast_net_income || 0,
+        });
+    }
+
     // 最新のドキュメントから会計基準を取得
     const latestDocument = documents.length > 0 ? documents[documents.length - 1] : null;
     const accountingStandard = latestDocument?.accounting_standard || 'J-GAAP';
@@ -262,6 +288,38 @@ const StockDetail = () => {
         } finally {
             setIsSubmittingPortfolio(false);
         }
+    };
+
+    /**
+     * 業績予想の保存処理
+     */
+    const handleForecastSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!code || !stock) return;
+
+        setIsSubmittingForecast(true);
+        setForecastError(null);
+        setForecastSuccess(false);
+        try {
+            const res = await saveStockForecast(code, forecastFormData);
+            setForecast(res.data);
+            setForecastSuccess(true);
+            setTimeout(() => {
+                setShowForecastModal(false);
+                setForecastSuccess(false);
+            }, 2000);
+        } catch (err: any) {
+            setForecastError(err.response?.data?.detail || '保存に失敗しました。');
+        } finally {
+            setIsSubmittingForecast(false);
+        }
+    };
+
+    const handleForecastChange = (field: keyof UserStockForecast, value: string) => {
+        setForecastFormData(prev => ({
+            ...prev,
+            [field]: value === '' ? undefined : (field === 'target_year' ? value : Number(value))
+        }));
     };
 
     return (
@@ -327,17 +385,34 @@ const StockDetail = () => {
                                     </div>
                                 </div>
                             )}
+                            {forecast?.forecast_eps && (
+                                <div>
+                                    <div className="text-xs text-gray-500 font-medium tracking-wide text-indigo-600">PER (会社予想)</div>
+                                    <div className="text-xl sm:text-2xl font-bold text-indigo-900 mt-0.5">
+                                        {(stock.current_price / forecast.forecast_eps).toFixed(1)}<span className="text-sm font-normal text-indigo-500 ml-1">倍</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
-
-                    <button
-                        type="button"
-                        onClick={() => setShowPortfolioModal(true)}
-                        className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                    >
-                        <FolderPlus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                        ポートフォリオに追加
-                    </button>
+                    
+                    <div className="flex flex-col gap-2 w-full sm:w-auto">
+                        <button
+                            type="button"
+                            onClick={() => setShowForecastModal(true)}
+                            className="w-full inline-flex items-center justify-center px-4 py-2 border-2 border-indigo-100 rounded-lg shadow-sm text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                        >
+                            ✍️ 業績予想を入力する
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowPortfolioModal(true)}
+                            className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                        >
+                            <FolderPlus className="-ml-1 mr-2 h-4 w-4" aria-hidden="true" />
+                            ポートフォリオに追加
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -598,6 +673,129 @@ const StockDetail = () => {
                                             type="button"
                                             onClick={() => setShowPortfolioModal(false)}
                                             className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                                        >
+                                            キャンセル
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+            
+            {/* 業績予想入力用モーダル */}
+            {
+                showForecastModal && (
+                    <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                        <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowForecastModal(false)}></div>
+                            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                            <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full border border-indigo-100">
+                                <form onSubmit={handleForecastSubmit}>
+                                    <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                                        <div className="sm:flex sm:items-start">
+                                            <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
+                                                <TrendingUp className="h-6 w-6 text-indigo-600" aria-hidden="true" />
+                                            </div>
+                                            <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <h3 className="text-lg leading-6 font-bold text-gray-900" id="modal-title">
+                                                        会社業績予想の入力
+                                                    </h3>
+                                                    <button type="button" onClick={() => setShowForecastModal(false)} className="text-gray-400 hover:text-gray-500">
+                                                        <X className="h-5 w-5" />
+                                                    </button>
+                                                </div>
+
+                                                 <div className="mt-4 space-y-4">
+                                                    {forecastError && (
+                                                        <div className="p-3 bg-red-50 border-l-4 border-red-500 text-xs text-red-700">{forecastError}</div>
+                                                    )}
+                                                    {forecastSuccess && (
+                                                        <div className="p-3 bg-indigo-50 border-l-4 border-indigo-500 text-xs text-indigo-700 font-bold">保存しました！</div>
+                                                    )}
+                                                    
+                                                    <div className="bg-yellow-50 p-3 rounded text-xs text-yellow-800 mb-2 border border-yellow-200">
+                                                        ※金額は「絶対額（円単位）」で入力してください。<br/>
+                                                        （例: 15億円の場合は <code>1500000000</code> を入力）
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="col-span-2">
+                                                            <label className="block text-xs font-bold text-gray-700 mb-1">対象年度名</label>
+                                                            <input
+                                                                type="text"
+                                                                value={forecastFormData.target_year || ''}
+                                                                onChange={(e) => handleForecastChange('target_year', e.target.value)}
+                                                                className="block w-full border border-gray-300 rounded shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                                                placeholder="例: 2025年度"
+                                                            />
+                                                        </div>
+                                                        <div className="col-span-2">
+                                                            <label className="block text-xs font-bold text-gray-700 mb-1">売上高 (円)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={forecastFormData.forecast_net_sales ?? ''}
+                                                                onChange={(e) => handleForecastChange('forecast_net_sales', e.target.value)}
+                                                                className="block w-full border border-gray-300 rounded shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-gray-700 mb-1">営業利益 (円)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={forecastFormData.forecast_operating_income ?? ''}
+                                                                onChange={(e) => handleForecastChange('forecast_operating_income', e.target.value)}
+                                                                className="block w-full border border-gray-300 rounded shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-gray-700 mb-1">経常利益 (円)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={forecastFormData.forecast_ordinary_income ?? ''}
+                                                                onChange={(e) => handleForecastChange('forecast_ordinary_income', e.target.value)}
+                                                                className="block w-full border border-gray-300 rounded shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+                                                            />
+                                                        </div>
+                                                        <div className="col-span-2 sm:col-span-1">
+                                                            <label className="block text-xs font-bold text-gray-700 mb-1">純利益 (円)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={forecastFormData.forecast_net_income ?? ''}
+                                                                onChange={(e) => handleForecastChange('forecast_net_income', e.target.value)}
+                                                                className="block w-full border border-gray-300 rounded shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+                                                            />
+                                                        </div>
+                                                        <div className="col-span-2 sm:col-span-1">
+                                                            <label className="block text-xs font-bold text-gray-700 mb-1">EPS (円)</label>
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                value={forecastFormData.forecast_eps ?? ''}
+                                                                onChange={(e) => handleForecastChange('forecast_eps', e.target.value)}
+                                                                className="block w-full border border-gray-300 rounded shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+                                                                placeholder="例: 125.4"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 px-4 py-3 sm:px-6 flex flex-row-reverse border-t border-gray-100">
+                                        <button
+                                            type="submit"
+                                            disabled={isSubmittingForecast}
+                                            className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto disabled:opacity-50"
+                                        >
+                                            {isSubmittingForecast ? '保存中...' : '予想を保存する'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowForecastModal(false)}
+                                            className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto"
                                         >
                                             キャンセル
                                         </button>

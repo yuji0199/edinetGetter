@@ -81,3 +81,47 @@ def create_stock(stock: schemas.StockBase, db: Session = Depends(database.get_db
     db.commit()
     db.refresh(new_stock)
     return new_stock
+
+@router.get("/{securities_code}/forecast", response_model=schemas.UserStockForecastResponse)
+def get_user_stock_forecast(securities_code: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
+    stock = db.query(models.Stock).filter(models.Stock.securities_code == securities_code).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+        
+    forecast = db.query(models.UserStockForecast).filter(
+        models.UserStockForecast.user_id == current_user.id,
+        models.UserStockForecast.stock_id == stock.id
+    ).first()
+    
+    if not forecast:
+        raise HTTPException(status_code=404, detail="Forecast not found")
+        
+    return forecast
+
+@router.put("/{securities_code}/forecast", response_model=schemas.UserStockForecastResponse)
+def update_user_stock_forecast(securities_code: str, forecast_data: schemas.UserStockForecastCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
+    stock = db.query(models.Stock).filter(models.Stock.securities_code == securities_code).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+        
+    forecast = db.query(models.UserStockForecast).filter(
+        models.UserStockForecast.user_id == current_user.id,
+        models.UserStockForecast.stock_id == stock.id
+    ).first()
+    
+    if forecast:
+        # Update existing
+        for key, value in forecast_data.model_dump().items():
+            setattr(forecast, key, value)
+    else:
+        # Create new
+        forecast = models.UserStockForecast(
+            user_id=current_user.id,
+            stock_id=stock.id,
+            **forecast_data.model_dump()
+        )
+        db.add(forecast)
+        
+    db.commit()
+    db.refresh(forecast)
+    return forecast

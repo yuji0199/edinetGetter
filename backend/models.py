@@ -83,3 +83,19 @@ class PortfolioItem(Base):
     
     portfolio = relationship("Portfolio", back_populates="items")
     stock = relationship("Stock")
+
+class UserStockForecast(Base):
+    __tablename__ = "user_stock_forecasts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    stock_id = Column(Integer, ForeignKey("stocks.id"))
+    target_year = Column(String(50), nullable=True) # e.g. "2025年度"
+    forecast_net_sales = Column(Float, nullable=True)
+    forecast_operating_income = Column(Float, nullable=True)
+    forecast_ordinary_income = Column(Float, nullable=True)
+    forecast_net_income = Column(Float, nullable=True)
+    forecast_eps = Column(Float, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    user = relationship("User")
+    stock = relationship("Stock")

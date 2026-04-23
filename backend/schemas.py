@@ -150,3 +150,23 @@ class GrowthAnalysisResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UserStockForecastBase(BaseModel):
+    target_year: Optional[str] = None
+    forecast_net_sales: Optional[float] = None
+    forecast_operating_income: Optional[float] = None
+    forecast_ordinary_income: Optional[float] = None
+    forecast_net_income: Optional[float] = None
+    forecast_eps: Optional[float] = None
+
+class UserStockForecastCreate(UserStockForecastBase):
+    pass
+
+class UserStockForecastResponse(UserStockForecastBase):
+    id: int
+    user_id: int
+    stock_id: int
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
