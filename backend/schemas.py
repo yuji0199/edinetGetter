@@ -170,3 +170,19 @@ class UserStockForecastResponse(UserStockForecastBase):
 
     class Config:
         from_attributes = True
+
+class UserStockNoteBase(BaseModel):
+    content: str
+
+class UserStockNoteCreate(UserStockNoteBase):
+    pass
+
+class UserStockNoteResponse(UserStockNoteBase):
+    id: int
+    user_id: int
+    stock_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

@@ -125,3 +125,51 @@ def update_user_stock_forecast(securities_code: str, forecast_data: schemas.User
     db.commit()
     db.refresh(forecast)
     return forecast
+
+@router.get("/{securities_code}/notes", response_model=List[schemas.UserStockNoteResponse])
+def get_user_stock_notes(securities_code: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
+    stock = db.query(models.Stock).filter(models.Stock.securities_code == securities_code).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+        
+    notes = db.query(models.UserStockNote).filter(
+        models.UserStockNote.user_id == current_user.id,
+        models.UserStockNote.stock_id == stock.id
+    ).order_by(models.UserStockNote.created_at.desc()).all()
+    
+    return notes
+
+@router.post("/{securities_code}/notes", response_model=schemas.UserStockNoteResponse)
+def create_user_stock_note(securities_code: str, note_data: schemas.UserStockNoteCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
+    stock = db.query(models.Stock).filter(models.Stock.securities_code == securities_code).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+        
+    new_note = models.UserStockNote(
+        user_id=current_user.id,
+        stock_id=stock.id,
+        content=note_data.content
+    )
+    db.add(new_note)
+    db.commit()
+    db.refresh(new_note)
+    return new_note
+
+@router.delete("/{securities_code}/notes/{note_id}")
+def delete_user_stock_note(securities_code: str, note_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
+    stock = db.query(models.Stock).filter(models.Stock.securities_code == securities_code).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+        
+    note = db.query(models.UserStockNote).filter(
+        models.UserStockNote.id == note_id,
+        models.UserStockNote.user_id == current_user.id,
+        models.UserStockNote.stock_id == stock.id
+    ).first()
+    
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+        
+    db.delete(note)
+    db.commit()
+    return {"message": "Note deleted successfully"}
