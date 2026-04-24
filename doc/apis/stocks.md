@@ -68,6 +68,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | 2026-03-07 | 全体 | 新規作成 | yuji |
 | 2 | 2026-03-11 | 指標 | PER, PBRの計算ロジックを追加 | yuji |
+| 3 | 2026-04-23 | 全体 | 業績予想(Forecast)およびメモ(Notes)機能を追加 | antigravity |
 
 </div>
 
@@ -217,3 +218,85 @@
    →項目名: `series`, `cagr_sales`, `cagr_profit` を返却（処理終了）
 
 </div>
+
+---
+
+## [API019] 銘柄別 業績予想の取得・更新
+
+ユーザーが入力した特定の銘柄に対する今期の業績予想を取得、または更新します。
+
+**基本情報**
+* **Method**: GET / PUT
+* **Path**: `/api/stocks/{securities_code}/forecast`
+* **認証**: 必要
+
+**リクエストパラメータ (PUT)**
+<div class="api-request">
+
+| No | 場所 | 項目名 | 型 | 必須 | 備考 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | Body | target_year | String | - | 対象年度 |
+| 2 | Body | forecast_net_sales | Number | - | 売上高予想 |
+| 3 | Body | forecast_operating_income | Number | - | 営業利益予想 |
+| 4 | Body | forecast_ordinary_income | Number | - | 経常利益予想 |
+| 5 | Body | forecast_net_income | Number | - | 純利益予想 |
+| 6 | Body | forecast_eps | Number | - | EPS予想 |
+
+</div>
+
+---
+
+## [API020] 銘柄別メモの取得
+
+特定の銘柄に関連付けられたユーザーのメモ一覧を取得します。
+
+**基本情報**
+* **Method**: GET
+* **Path**: `/api/stocks/{securities_code}/notes`
+* **認証**: 必要
+
+**レスポンス**
+<div class="api-response">
+
+| No | 項目名 | 型 | 備考 |
+| :--- | :--- | :--- | :--- |
+| 1 | Array | Object | メモのリスト（降順） |
+| 1.1 | id | Number | メモID |
+| 1.2 | content | String | メモ内容 |
+| 1.3 | image_path | String | 添付画像パス |
+| 1.4 | created_at | DateTime | 投稿日時 |
+
+</div>
+
+---
+
+## [API021] 銘柄別メモの投稿（画像対応）
+
+特定の銘柄に対してメモ（および画像）を投稿します。
+
+**基本情報**
+* **Method**: POST
+* **Path**: `/api/stocks/{securities_code}/notes`
+* **認証**: 必要
+* **Content-Type**: `multipart/form-data`
+
+**リクエストパラメータ**
+<div class="api-request">
+
+| No | 場所 | 項目名 | 型 | 必須 | 備考 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | FormData | content | String | ○ | メモ本文 |
+| 2 | FormData | image | File | - | 添付画像ファイル |
+
+</div>
+
+---
+
+## [API022] 銘柄別メモの削除
+
+投稿済みのメモを削除します。
+
+**基本情報**
+* **Method**: DELETE
+* **Path**: `/api/stocks/{securities_code}/notes/{note_id}`
+* **認証**: 必要
