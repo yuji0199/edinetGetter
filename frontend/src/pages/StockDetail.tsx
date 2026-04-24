@@ -108,6 +108,15 @@ const StockDetail = () => {
     const [forecastError, setForecastError] = useState<string | null>(null);
     const [forecastSuccess, setForecastSuccess] = useState<boolean>(false);
 
+    // メモタイムラインの状態管理
+    const [notes, setNotes] = useState<any[]>([]);
+    const [newNoteContent, setNewNoteContent] = useState<string>('');
+    const [isSubmittingNote, setIsSubmittingNote] = useState<boolean>(false);
+    const [noteError, setNoteError] = useState<string | null>(null);
+    const [newNoteImage, setNewNoteImage] = useState<File | null>(null);
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
     useEffect(() => {
         /**
          * 銘柄の詳細情報、財務書類、ポートフォリオ一覧、成長性データを一括で取得する
@@ -117,12 +126,13 @@ const StockDetail = () => {
             try {
                 setLoading(true);
                 // 並列実行により初期ロード時間を短縮する意図
-                const [stockRes, docsRes, portRes, growthRes, forecastRes] = await Promise.allSettled([
+                const [stockRes, docsRes, portRes, growthRes, forecastRes, notesRes] = await Promise.allSettled([
                     getStock(code),
                     getStockDocuments(code),
                     getPortfolios(),
                     getStockGrowth(code),
-                    getStockForecast(code)
+                    getStockForecast(code),
+                    import('../api').then(api => api.getStockNotes(code))
                 ]);
                 
                 if (stockRes.status === "fulfilled") setStock(stockRes.value.data);
@@ -132,6 +142,10 @@ const StockDetail = () => {
                 if (forecastRes.status === "fulfilled" && forecastRes.value.data) {
                     setForecast(forecastRes.value.data);
                     setForecastFormData(forecastRes.value.data);
+                }
+
+                if (notesRes.status === "fulfilled" && notesRes.value.data) {
+                    setNotes(notesRes.value.data);
                 }
 
                 // metrics_jsonをパースして型定義済みのオブジェクトとして扱う
@@ -320,6 +334,63 @@ const StockDetail = () => {
             ...prev,
             [field]: value === '' ? undefined : (field === 'target_year' ? value : Number(value))
         }));
+    };
+
+    /**
+     * メモの保存処理
+     */
+    const handleNoteSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!code || !newNoteContent.trim()) return;
+
+        setIsSubmittingNote(true);
+        setNoteError(null);
+        try {
+            const formData = new FormData();
+            formData.append("content", newNoteContent);
+            if (newNoteImage) {
+                formData.append("image", newNoteImage);
+            }
+
+            const api = await import('../api');
+            const res = await api.addStockNote(code, formData);
+            setNotes(prev => [res.data, ...prev]);
+            setNewNoteContent('');
+            setNewNoteImage(null);
+            setPreviewImageUrl(null);
+        } catch (err: any) {
+            setNoteError(err.response?.data?.detail || 'メモの保存に失敗しました。');
+        } finally {
+            setIsSubmittingNote(false);
+        }
+    };
+
+    const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setNewNoteImage(file);
+            setPreviewImageUrl(URL.createObjectURL(file));
+        }
+    };
+
+    const handleClearImage = () => {
+        setNewNoteImage(null);
+        setPreviewImageUrl(null);
+    };
+
+    /**
+     * メモの削除処理
+     */
+    const handleNoteDelete = async (noteId: number) => {
+        if (!code || !window.confirm('このメモを削除してもよろしいですか？')) return;
+        
+        try {
+            const api = await import('../api');
+            await api.deleteStockNote(code, noteId);
+            setNotes(prev => prev.filter(note => note.id !== noteId));
+        } catch (err: any) {
+            alert(err.response?.data?.detail || 'メモの削除に失敗しました。');
+        }
     };
 
     return (
@@ -571,6 +642,78 @@ const StockDetail = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* メモ機能セクション */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8 mt-8">
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                            📝 投資戦略・ニュースメモ
+                        </h3>
+                        
+                        <form onSubmit={handleNoteSubmit} className="mb-8">
+                            <textarea
+                                value={newNoteContent}
+                                onChange={(e) => setNewNoteContent(e.target.value)}
+                                placeholder="決算の所感や関連ニュース、投資判断のメモを書き残しましょう..."
+                                className="w-full border border-gray-300 rounded-lg shadow-sm p-4 text-sm focus:ring-blue-500 focus:border-blue-500 mb-2"
+                                rows={3}
+                            />
+                            {previewImageUrl && (
+                                <div className="relative inline-block mb-3">
+                                    <img src={previewImageUrl} alt="preview" className="h-32 rounded border border-gray-200 object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={handleClearImage}
+                                        className="absolute -top-2 -right-2 bg-white text-gray-500 rounded-full border border-gray-200 p-1 hover:text-red-500 shadow"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            )}
+                            {noteError && (
+                                <p className="text-red-500 text-xs mb-3">{noteError}</p>
+                            )}
+                            <div className="flex justify-between items-center">
+                                <label className="cursor-pointer inline-flex items-center text-sm text-gray-600 hover:text-blue-600">
+                                    <span className="mr-2">📷 画像を添付</span>
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
+                                </label>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingNote || !newNoteContent.trim()}
+                                    className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
+                                >
+                                    {isSubmittingNote ? '保存中...' : 'メモを追加する'}
+                                </button>
+                            </div>
+                        </form>
+
+                        <div className="space-y-4">
+                            {notes.length > 0 ? notes.map(note => (
+                                <div key={note.id} className="bg-gray-50 border border-gray-100 rounded-lg p-4 relative group">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="text-xs font-medium text-gray-500">
+                                            {new Date(note.created_at).toLocaleString('ja-JP')}
+                                        </div>
+                                        <button
+                                            onClick={() => handleNoteDelete(note.id)}
+                                            className="text-gray-400 hover:text-red-600 opacity-50 hover:opacity-100 transition-opacity p-1"
+                                            title="削除"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    <p className="text-sm text-gray-800 whitespace-pre-wrap mb-2">{note.content}</p>
+                                    {note.image_path && (
+                                        <div className="mt-2 cursor-pointer" onClick={() => setLightboxImage('http://localhost:8000' + note.image_path)}>
+                                            <img src={'http://localhost:8000' + note.image_path} alt="note attached figure" className="max-h-48 rounded border border-gray-200 object-cover hover:opacity-90 transition-opacity" />
+                                        </div>
+                                    )}
+                                </div>
+                            )) : (
+                                <p className="text-sm text-gray-500 text-center py-4">まだメモがありません。</p>
+                            )}
+                        </div>
+                    </div>
                 </div>
             ) : (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
@@ -806,6 +949,22 @@ const StockDetail = () => {
                     </div>
                 )
             }
+
+            {/* メモ画像拡大用 Lightbox モーダル */}
+            {lightboxImage && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-90 transition-opacity" onClick={() => setLightboxImage(null)}>
+                    <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-8">
+                        <button
+                            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 bg-black bg-opacity-50 rounded-full"
+                            onClick={() => setLightboxImage(null)}
+                            title="閉じる"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                        <img src={lightboxImage} alt="Expanded view" className="max-w-full max-h-full object-contain rounded shadow-2xl" onClick={(e) => e.stopPropagation()} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

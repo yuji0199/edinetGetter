@@ -73,7 +73,34 @@ erDiagram
 
     users ||--o{ analysis_methods : "has"
     users ||--o{ portfolios : "creates"
+    users ||--o{ user_stock_forecast : "predicts"
+    users ||--o{ user_stock_notes : "writes"
     stocks ||--o{ financial_documents : "has"
+    stocks ||--o{ user_stock_forecast : "has"
+    stocks ||--o{ user_stock_notes : "has"
     portfolios ||--o{ portfolio_items : "contains"
     stocks ||--o{ portfolio_items : "included in"
+
+    user_stock_forecast {
+        Integer id PK
+        Integer user_id FK
+        Integer stock_id FK
+        String target_year "対象年度"
+        Float forecast_net_sales
+        Float forecast_operating_income
+        Float forecast_ordinary_income
+        Float forecast_net_income
+        Float forecast_eps
+        DateTime updated_at
+    }
+
+    user_stock_notes {
+        Integer id PK
+        Integer user_id FK
+        Integer stock_id FK
+        Text content
+        String image_path
+        DateTime created_at
+        DateTime updated_at
+    }
 ```
